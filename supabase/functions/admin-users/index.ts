@@ -11,19 +11,31 @@ async function requireUserManagement(ctx: any) {
   const userId = ctx.userClaims?.sub
   if (!userId) return { ok: false, status: 401, message: 'กรุณาเข้าสู่ระบบ' }
 
-  const { data, error } = await ctx.supabaseAdmin
+  const { data: userRoleRows, error: roleError } = await ctx.supabaseAdmin
     .from('user_roles')
-    .select('roles!inner(role_permissions!inner(permissions!inner(code)))')
+    .select('role_id')
     .eq('user_id', userId)
-    .eq('roles.role_permissions.permissions.code', 'users.manage')
-    .limit(1)
 
-  if (error) {
-    console.error('permission check failed', error)
+  if (roleError) {
+    console.error('role lookup failed', roleError)
     return { ok: false, status: 500, message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' }
   }
 
-  if (!data?.length) return { ok: false, status: 403, message: 'ไม่มีสิทธิ์จัดการผู้ใช้งาน' }
+  const roleIds = (userRoleRows ?? []).map((row: any) => row.role_id)
+  if (!roleIds.length) return { ok: false, status: 403, message: 'ไม่มีสิทธิ์จัดการผู้ใช้งาน' }
+
+  const { data: permissionRows, error: permissionError } = await ctx.supabaseAdmin
+    .from('role_permissions')
+    .select('role_id,permissions!inner(code)')
+    .in('role_id', roleIds)
+
+  if (permissionError) {
+    console.error('permission lookup failed', permissionError)
+    return { ok: false, status: 500, message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' }
+  }
+
+  const allowed = (permissionRows ?? []).some((row: any) => row.permissions?.code === 'users.manage')
+  if (!allowed) return { ok: false, status: 403, message: 'ไม่มีสิทธิ์จัดการผู้ใช้งาน' }
   return { ok: true, userId }
 }
 
@@ -155,9 +167,8 @@ export default {
       const permission = await requireUserManagement(ctx)
       if (!permission.ok) return response({ error: permission.message }, permission.status)
 
-      if (req.method === 'GET') return listUsers(ctx)
-
-      const body = await req.json()
+      const body = req.method === 'GET' ? { action: 'list' } : await req.json()
+      if (body.action === 'list') return listUsers(ctx)
       if (body.action === 'invite') return inviteUser(ctx, body)
       if (body.action === 'update') return updateUser(ctx, body)
       if (body.action === 'delete') return deleteUser(ctx, body)
