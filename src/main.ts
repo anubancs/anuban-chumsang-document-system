@@ -82,7 +82,7 @@ async function showDocument(kind:'incoming'|'outgoing',id:string,userId:string){
 }
 
 async function renderUsers(userId:string){
- const {data,error}=await supabase.functions.invoke('admin-users',{method:'GET'})
+ const {data,error}=await supabase.functions.invoke('admin-users',{body:{action:'list'}})
  if(error||!data){alert('โหลดผู้ใช้งานไม่สำเร็จ: '+(error?.message||'เกิดข้อผิดพลาด'));return}
  const users=(data.users||[]) as any[]
  const roleLabel=(code:string)=>({admin:'ผู้ดูแลระบบ',director:'ผู้อำนวยการ',officer:'เจ้าหน้าที่สารบรรณ',staff:'ผู้ใช้งาน'})[code]||code
