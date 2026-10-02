@@ -173,12 +173,15 @@ async function renderDocumentList(kind:'incoming'|'outgoing',userId:string,searc
 async function renderDashboard(userId:string,view:View='dashboard'){
  if(view==='users'){await renderUsers(userId);return}
  if(view==='incoming'||view==='outgoing'){await renderDocumentList(view,userId);return}
- const [p,inc,out,tasks,roles]=await Promise.all([
+ const [p,inc,out,tasks,roles,incCount,outCount,pendingApproval]=await Promise.all([
   loadProfile(userId),
   supabase.from('incoming_documents').select('id,document_no,received_date,subject,status').order('received_date',{ascending:false}).limit(10),
   supabase.from('outgoing_documents').select('id,document_no,document_date,subject,status').order('document_date',{ascending:false}).limit(10),
   supabase.from('assignments').select('id,incoming_document_id,outgoing_document_id,due_date,status,note,incoming_documents(document_no,subject),outgoing_documents(document_no,subject)').eq('assigned_to',userId).neq('status','completed').order('due_date').limit(20),
-  supabase.from('user_roles').select('roles(name)').eq('user_id',userId)
+  supabase.from('user_roles').select('roles(name)').eq('user_id',userId),
+  supabase.from('incoming_documents').select('id',{count:'exact',head:true}),
+  supabase.from('outgoing_documents').select('id',{count:'exact',head:true}),
+  supabase.from('outgoing_documents').select('id',{count:'exact',head:true}).eq('status','pending_approval')
  ])
  const role=(roles.data?.[0] as any)?.roles?.name||'ผู้ใช้งาน'
  let content=''
