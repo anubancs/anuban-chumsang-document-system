@@ -6,6 +6,18 @@ const app = document.querySelector<HTMLDivElement>('#app')!
 type View = 'dashboard' | 'incoming' | 'outgoing' | 'tasks'
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] as string))
 const today=()=>new Date().toISOString().slice(0,10)
+const functionUrl='https://uwebbofczidcfnjbvsqu.supabase.co/functions/v1/drive-file'
+async function uploadMetadata(documentType:'incoming'|'outgoing'){
+  const input=document.querySelector<HTMLInputElement>('#doc-file')
+  const file=input?.files?.[0]
+  if(!file)return
+  const {data:{session}}=await supabase.auth.getSession()
+  if(!session)return
+  const response=await fetch(functionUrl,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({document_type:documentType,file_name:file.name,mime_type:file.type,file_size:file.size})})
+  const result=await response.json().catch(()=>({}))
+  const m=document.querySelector('#file-message')!
+  m.textContent=response.ok&&result.ok?'เตรียมไฟล์สำเร็จ':'ยังไม่ได้เชื่อม Google Drive: '+(result.message||'กรุณาตั้งค่า Google Drive')
+}
 
 async function loadProfile(id:string):Promise<Profile|null>{const {data}=await supabase.from('profiles').select('*').eq('id',id).maybeSingle();return data}
 
