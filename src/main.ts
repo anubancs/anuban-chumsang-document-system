@@ -7,6 +7,8 @@ type View = 'dashboard' | 'incoming' | 'outgoing' | 'tasks'
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] as string))
 const today=()=>new Date().toISOString().slice(0,10)
 const functionUrl='https://uwebbofczidcfnjbvsqu.supabase.co/functions/v1/drive-file'
+const productionUrl='https://anuban-chumsang-document-system.60010106nkw1.workers.dev'
+const authRedirectUrl=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?window.location.origin:productionUrl
 async function uploadDocumentFile(documentType:'incoming'|'outgoing',documentId:string,file:File){
   const m=document.querySelector('#file-message')!
   if(file.size>20*1024*1024){m.textContent='ไฟล์มีขนาดเกิน 20 MB';m.className='full error';return false}
@@ -31,7 +33,7 @@ async function loadProfile(id:string):Promise<Profile|null>{const {data}=await s
 function renderLogin(message=''){
  app.innerHTML='<main class="auth-shell"><section class="auth-card"><div class="brand">โรงเรียนอนุบาลชุมแสง</div><h1>ระบบสารบรรณอิเล็กทรอนิกส์</h1><p class="muted">วัดทับกฤชกลาง</p><form id="login-form"><label>อีเมล<input id="email" type="email" required></label><label>รหัสผ่าน<input id="password" type="password" required></label><button>เข้าสู่ระบบ</button><p class="error">'+esc(message)+'</p></form><button id="forgot-password" class="link-btn" type="button">ลืมรหัสผ่าน?</button><button id="signup" class="secondary">สร้างบัญชีผู้ดูแลคนแรก</button></section></main>'
  document.querySelector<HTMLFormElement>('#login-form')!.onsubmit=async e=>{e.preventDefault();const email=(document.querySelector<HTMLInputElement>('#email')!).value;const password=(document.querySelector<HTMLInputElement>('#password')!).value;const {error}=await supabase.auth.signInWithPassword({email,password});if(error)renderLogin(error.message)}
- document.querySelector<HTMLButtonElement>('#forgot-password')!.onclick=async()=>{const current=(document.querySelector<HTMLInputElement>('#email')!).value.trim();const email=prompt('กรุณากรอกอีเมลสำหรับรีเซ็ตรหัสผ่าน',current)||'';if(!email)return;const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin});if(error){renderLogin('ส่งคำขอรีเซ็ตรหัสผ่านไม่สำเร็จ: '+error.message);return}alert('ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลแล้ว กรุณาตรวจสอบกล่องจดหมายและ Spam')}
+ document.querySelector<HTMLButtonElement>('#forgot-password')!.onclick=async()=>{const current=(document.querySelector<HTMLInputElement>('#email')!).value.trim();const email=prompt('กรุณากรอกอีเมลสำหรับรีเซ็ตรหัสผ่าน',current)||'';if(!email)return;const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:authRedirectUrl});if(error){renderLogin('ส่งคำขอรีเซ็ตรหัสผ่านไม่สำเร็จ: '+error.message);return}alert('ส่งลิงก์รีเซ็ตรหัสผ่านไปยังอีเมลแล้ว กรุณาตรวจสอบกล่องจดหมายและ Spam')}
  document.querySelector<HTMLButtonElement>('#signup')!.onclick=async()=>{const email=prompt('อีเมลผู้ดูแลระบบ');const password=prompt('รหัสผ่านอย่างน้อย 6 ตัวอักษร');if(!email||!password)return;const name=prompt('ชื่อผู้ดูแลระบบ')||email.split('@')[0];const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name}}});if(error){renderLogin(error.message);return}if(data.user&&data.session){await supabase.rpc('ensure_first_admin')}alert(data.session?'สร้างบัญชีสำเร็จ':'สร้างบัญชีสำเร็จ กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ')}
 }
 
