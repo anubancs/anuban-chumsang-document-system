@@ -31,7 +31,7 @@ async function loadProfile(id:string):Promise<Profile|null>{const {data}=await s
 function renderLogin(message=''){
  app.innerHTML='<main class="auth-shell"><section class="auth-card"><div class="brand">โรงเรียนอนุบาลชุมแสง</div><h1>ระบบสารบรรณอิเล็กทรอนิกส์</h1><p class="muted">วัดทับกฤชกลาง</p><form id="login-form"><label>อีเมล<input id="email" type="email" required></label><label>รหัสผ่าน<input id="password" type="password" required></label><button>เข้าสู่ระบบ</button><p class="error">'+esc(message)+'</p></form><button id="signup" class="secondary">สร้างบัญชีผู้ดูแลคนแรก</button></section></main>'
  document.querySelector<HTMLFormElement>('#login-form')!.onsubmit=async e=>{e.preventDefault();const email=(document.querySelector<HTMLInputElement>('#email')!).value;const password=(document.querySelector<HTMLInputElement>('#password')!).value;const {error}=await supabase.auth.signInWithPassword({email,password});if(error)renderLogin(error.message)}
- document.querySelector<HTMLButtonElement>('#signup')!.onclick=async()=>{const email=prompt('อีเมลผู้ดูแลระบบ');const password=prompt('รหัสผ่านอย่างน้อย 6 ตัวอักษร');if(!email||!password)return;const name=prompt('ชื่อผู้ดูแลระบบ')||email.split('@')[0];const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name}}});if(error){renderLogin(error.message);return}if(data.user){const {data:r}=await supabase.from('roles').select('id').eq('code','admin').single();if(r)await supabase.from('user_roles').insert({user_id:data.user.id,role_id:r.id,assigned_by:data.user.id})}alert(data.session?'สร้างบัญชีสำเร็จ':'สร้างบัญชีสำเร็จ กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ')}
+ document.querySelector<HTMLButtonElement>('#signup')!.onclick=async()=>{const email=prompt('อีเมลผู้ดูแลระบบ');const password=prompt('รหัสผ่านอย่างน้อย 6 ตัวอักษร');if(!email||!password)return;const name=prompt('ชื่อผู้ดูแลระบบ')||email.split('@')[0];const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name}}});if(error){renderLogin(error.message);return}if(data.user&&data.session){await supabase.rpc('ensure_first_admin')}alert(data.session?'สร้างบัญชีสำเร็จ':'สร้างบัญชีสำเร็จ กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ')}
 }
 
 async function saveDoc(kind:'incoming'|'outgoing',userId:string){
@@ -87,7 +87,7 @@ async function renderDashboard(userId:string,view:View='dashboard'){
  document.querySelectorAll<HTMLElement>('[data-doc-id]').forEach(el=>el.addEventListener('click',()=>showDocument(el.dataset.docKind as 'incoming'|'outgoing',el.dataset.docId!,userId)))
 }
 
-async function ensureFirstAdmin(userId:string){const {data:roles}=await supabase.from('user_roles').select('role_id').eq('user_id',userId).limit(1);if(roles&&roles.length)return;const {data:r}=await supabase.from('roles').select('id').eq('code','admin').single();if(r)await supabase.from('user_roles').insert({user_id:userId,role_id:r.id,assigned_by:userId})}
+async function ensureFirstAdmin(_userId:string){await supabase.rpc('ensure_first_admin')}
 
 async function boot(){const {data:{session}}=await supabase.auth.getSession();if(session?.user){await ensureFirstAdmin(session.user.id);await renderDashboard(session.user.id)}else renderLogin();supabase.auth.onAuthStateChange(async(_,s)=>{if(s?.user){await ensureFirstAdmin(s.user.id);await renderDashboard(s.user.id)}else renderLogin()})}
 boot()
