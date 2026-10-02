@@ -7,16 +7,23 @@ type View = 'dashboard' | 'incoming' | 'outgoing' | 'tasks'
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] as string))
 const today=()=>new Date().toISOString().slice(0,10)
 const functionUrl='https://uwebbofczidcfnjbvsqu.supabase.co/functions/v1/drive-file'
-async function uploadMetadata(documentType:'incoming'|'outgoing'){
-  const input=document.querySelector<HTMLInputElement>('#doc-file')
-  const file=input?.files?.[0]
-  if(!file)return
-  const {data:{session}}=await supabase.auth.getSession()
-  if(!session)return
-  const response=await fetch(functionUrl,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,'Content-Type':'application/json'},body:JSON.stringify({document_type:documentType,file_name:file.name,mime_type:file.type,file_size:file.size})})
-  const result=await response.json().catch(()=>({}))
+async function uploadDocumentFile(documentType:'incoming'|'outgoing',documentId:string,file:File){
   const m=document.querySelector('#file-message')!
-  m.textContent=response.ok&&result.ok?'เตรียมไฟล์สำเร็จ':'ยังไม่ได้เชื่อม Google Drive: '+(result.message||'กรุณาตั้งค่า Google Drive')
+  if(file.size>20*1024*1024){m.textContent='ไฟล์มีขนาดเกิน 20 MB';m.className='full error';return false}
+  const body=new FormData()
+  body.append('document_type',documentType)
+  body.append('document_id',documentId)
+  body.append('file',file)
+  const {data:{session}}=await supabase.auth.getSession()
+  if(!session){m.textContent='เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';m.className='full error';return false}
+  try{
+    const response=await fetch(functionUrl,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:'sb_publishable_3xMsRwdyNUhPsnJiH34O9w_hnF8BUiV'},body})
+    const result=await response.json().catch(()=>({}))
+    if(!response.ok||!result.ok){m.textContent='อัปโหลดไฟล์ไม่สำเร็จ: '+(result.message||'เกิดข้อผิดพลาด');m.className='full error';return false}
+    m.textContent='อัปโหลดไฟล์ไป Google Drive สำเร็จ';m.className='full success';return true
+  }catch(error){
+    m.textContent='เชื่อมต่อ Google Drive ไม่สำเร็จ: '+(error instanceof Error?error.message:'เกิดข้อผิดพลาด');m.className='full error';return false
+  }
 }
 
 async function loadProfile(id:string):Promise<Profile|null>{const {data}=await supabase.from('profiles').select('*').eq('id',id).maybeSingle();return data}
@@ -30,14 +37,21 @@ function renderLogin(message=''){
 async function saveDoc(kind:'incoming'|'outgoing',userId:string){
  const fd=new FormData(document.querySelector<HTMLFormElement>('#doc-form')!);
  const data=kind==='incoming'?{received_date:fd.get('date'),document_date:fd.get('documentDate')||null,subject:fd.get('subject'),sender:fd.get('sender')||null,priority:fd.get('priority'),description:fd.get('description')||null,created_by:userId}:{document_date:fd.get('date'),subject:fd.get('subject'),recipient:fd.get('recipient')||null,priority:fd.get('priority'),description:fd.get('description')||null,created_by:userId};
- const table=kind==='incoming'?'incoming_documents':'outgoing_documents';const {error}=await supabase.from(table).insert(data);
- const m=document.querySelector('#form-message')!;m.textContent=error?'บันทึกไม่สำเร็จ: '+error.message:'บันทึกเรียบร้อย';m.className=error?'error success-area':'success success-area';if(!error)(document.querySelector<HTMLFormElement>('#doc-form')!).reset()
+ const table=kind==='incoming'?'incoming_documents':'outgoing_documents';const {data:created,error}=await supabase.from(table).insert(data).select('id').single();
+ const m=document.querySelector('#form-message')!;
+ if(error){m.textContent='บันทึกไม่สำเร็จ: '+error.message;m.className='error success-area';return}
+ const file=document.querySelector<HTMLInputElement>('#doc-file')?.files?.[0]
+ if(file){
+   const uploaded=await uploadDocumentFile(kind,created.id,file)
+   if(!uploaded){m.textContent='บันทึกทะเบียนแล้ว แต่ไฟล์ยังอัปโหลดไม่สำเร็จ กรุณาตรวจสอบข้อความด้านบน';m.className='error success-area';return}
+ }
+ m.textContent=file?'บันทึกทะเบียนและไฟล์เรียบร้อย':'บันทึกทะเบียนเรียบร้อย';m.className='success success-area';(document.querySelector<HTMLFormElement>('#doc-form')!).reset()
 }
 
 async function documentForm(kind:'incoming'|'outgoing',userId:string){
  const incoming=kind==='incoming';
  app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><main class="page"><button id="back" class="link-btn">← กลับหน้าหลัก</button><section class="panel form-panel"><h1>'+ (incoming?'ลงทะเบียนหนังสือรับ':'ลงทะเบียนหนังสือส่ง') +'</h1><p class="muted">เลขทะเบียนจะถูกสร้างอัตโนมัติ</p><form id="doc-form" class="form-grid"><label>วันที่<input name="date" type="date" value="'+today()+'" required></label>'+(incoming?'<label>วันที่หนังสือ<input name="documentDate" type="date"></label>':'')+'<label>เรื่อง<input name="subject" required></label><label>'+(incoming?'ผู้ส่ง':'ผู้รับ')+'<input name="'+(incoming?'sender':'recipient')+'"></label><label>ความเร่งด่วน<select name="priority"><option value="normal">ปกติ</option><option value="urgent">ด่วน</option><option value="very_urgent">ด่วนมาก</option></select></label><label class="full">รายละเอียด<textarea name="description" rows="5"></textarea></label><label class="full">ไฟล์เอกสาร<input id="doc-file" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png"></label><p id="file-message" class="full muted">ไฟล์จะถูกจัดการผ่าน Google Drive เมื่อเชื่อมต่อบัญชีแล้ว</p><div class="full actions"><button>บันทึก</button></div><p id="form-message" class="full"></p></form></section></main></div>'
- document.querySelector('#back')!.addEventListener('click',()=>renderDashboard(userId,'dashboard'));document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut());document.querySelector<HTMLFormElement>('#doc-form')!.onsubmit=async e=>{e.preventDefault();await saveDoc(kind,userId);await uploadMetadata(kind)}
+ document.querySelector('#back')!.addEventListener('click',()=>renderDashboard(userId,'dashboard'));document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut());document.querySelector<HTMLFormElement>('#doc-form')!.onsubmit=async e=>{e.preventDefault();await saveDoc(kind,userId)}
 }
 
 function listRows(rows:any[],dateField:string,kind?:'incoming'|'outgoing'){return rows.map(d=>'<div class="table-row '+(kind?'clickable':'')+'" '+(kind?'data-doc-kind="'+kind+'" data-doc-id="'+esc(d.id)+'"':'')+'><span>'+esc(d.document_no)+'</span><span>'+esc(d[dateField])+'</span><span>'+esc(d.subject)+'</span><span>'+esc(d.status)+'</span></div>').join('')||'<p class="muted">ยังไม่มีรายการ</p>'}
