@@ -81,6 +81,17 @@ async function showDocument(kind:'incoming'|'outgoing',id:string,userId:string){
  document.querySelectorAll<HTMLButtonElement>('[data-task]').forEach(b=>b.onclick=async()=>{const {error}=await supabase.from('assignments').update({status:'completed'}).eq('id',b.dataset.task!);if(error)alert('อัปเดตงานไม่สำเร็จ: '+error.message);else await showDocument(kind,id,userId)})
 }
 
+async async function functionErrorMessage(error:any){
+  if(error?.context?.json){
+    try{
+      const body=await error.context.json()
+      if(body?.error)return String(body.error)
+      if(body?.message)return String(body.message)
+    }catch{}
+  }
+  return error?.message||'เกิดข้อผิดพลาด'
+}
+
 async function invokeAdminUsers(body:any){
   let {data:{session}}=await supabase.auth.getSession()
   if(!session){
@@ -96,7 +107,7 @@ async function invokeAdminUsers(body:any){
 
 async function renderUsers(userId:string){
  const {data,error}=await invokeAdminUsers({action:'list'})
- if(error||!data){alert('โหลดผู้ใช้งานไม่สำเร็จ: '+(error?.message||'เกิดข้อผิดพลาด'));return}
+ if(error||!data){alert('โหลดผู้ใช้งานไม่สำเร็จ: '+await functionErrorMessage(error));return}
  const users=(data.users||[]) as any[]
  const roleLabel=(code:string)=>({admin:'ผู้ดูแลระบบ',director:'ผู้อำนวยการ',officer:'เจ้าหน้าที่สารบรรณ',staff:'ผู้ใช้งาน'})[code]||code
  const rows=users.map(u=>{
@@ -113,7 +124,7 @@ async function renderUsers(userId:string){
    const fd=new FormData(e.currentTarget)
    const m=document.querySelector('#users-message')!
    const {error}=await invokeAdminUsers({action:'invite',full_name:fd.get('full_name'),email:fd.get('email'),role_code:fd.get('role_code')})
-   if(error){m.textContent='ส่งคำเชิญไม่สำเร็จ: '+error.message;m.className='error';return}
+   if(error){m.textContent='ส่งคำเชิญไม่สำเร็จ: '+await functionErrorMessage(error);m.className='error';return}
    m.textContent='ส่งคำเชิญเรียบร้อย ผู้ใช้งานจะได้รับอีเมลเพื่อเข้าระบบ';m.className='success'
    e.currentTarget.reset()
    setTimeout(()=>renderUsers(userId),800)
@@ -124,27 +135,60 @@ async function renderUsers(userId:string){
    const current=u.roles?.[0]?.code||'staff'
    const roleCode=prompt('บทบาท: admin / director / officer / staff',current);if(roleCode===null)return
    const {error}=await invokeAdminUsers({action:'update',user_id:u.id,full_name:fullName,role_code:roleCode})
-   if(error)alert('แก้ไขไม่สำเร็จ: '+error.message);else await renderUsers(userId)
+   if(error)alert('แก้ไขไม่สำเร็จ: '+await functionErrorMessage(error));else await renderUsers(userId)
  })
  document.querySelectorAll<HTMLButtonElement>('[data-delete-user]').forEach(b=>b.onclick=async()=>{
    const u=users.find(x=>x.id===b.dataset.deleteUser);if(!u)return
    if(!confirm('ยืนยันการลบบัญชี '+(u.full_name||u.email)+' ?'))return
    const {error}=await invokeAdminUsers({action:'delete',user_id:u.id})
-   if(error)alert('ลบผู้ใช้งานไม่สำเร็จ: '+error.message);else await renderUsers(userId)
+   if(error)alert('ลบผู้ใช้งานไม่สำเร็จ: '+await functionErrorMessage(error));else await renderUsers(userId)
  })
+}
+
+async function renderDocumentList(kind:'incoming'|'outgoing',userId:string,search=''){
+ const table=kind==='incoming'?'incoming_documents':'outgoing_documents'
+ const dateField=kind==='incoming'?'received_date':'document_date'
+ const title=kind==='incoming'?'หนังสือรับ':'หนังสือส่ง'
+ let query=supabase.from(table).select('id,document_no,'+dateField+',subject,status')
+ if(search.trim()){
+   const q=search.trim().replace(/[%_]/g,'')
+   query=query.or('document_no.ilike.%'+q+'%,subject.ilike.%'+q+'%')
+ }
+ const {data,error}=await query.order(dateField,{ascending:false}).limit(100)
+ if(error){alert('โหลด'+title+'ไม่สำเร็จ: '+error.message);return}
+ app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button data-list-nav="dashboard">ภาพรวม</button><button class="active" data-list-nav="'+kind+'">'+title+'</button><button data-list-nav="'+(kind==='incoming'?'outgoing':'incoming')+'">'+(kind==='incoming'?'หนังสือส่ง':'หนังสือรับ')+'</button><button data-list-nav="tasks">งานของฉัน</button><hr><button id="new-in">＋ ลงทะเบียนหนังสือรับ</button><button id="new-out">＋ ลงทะเบียนหนังสือส่ง</button></aside><main class="page"><section class="welcome"><h1>'+title+'</h1><div class="toolbar"><input id="document-search" placeholder="ค้นหาเลขทะเบียนหรือชื่อเรื่อง" value="'+esc(search)+'"><button id="search-document">ค้นหา</button><button id="new-document">＋ ลงทะเบียน'+title+'</button></div></section><section class="panel"><div class="table-head"><b>เลขทะเบียน</b><b>วันที่</b><b>เรื่อง</b><b>สถานะ</b></div>'+listRows(data||[],dateField,kind)+'</section></main></div></div>'
+ document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
+ document.querySelectorAll<HTMLButtonElement>('[data-list-nav]').forEach(b=>b.onclick=()=>{const v=b.dataset.listNav as View;if(v==='incoming'||v==='outgoing')renderDocumentList(v,userId);else renderDashboard(userId,v)})
+ document.querySelector('#new-in')!.addEventListener('click',()=>documentForm('incoming',userId))
+ document.querySelector('#new-out')!.addEventListener('click',()=>documentForm('outgoing',userId))
+ document.querySelector('#new-document')!.addEventListener('click',()=>documentForm(kind,userId))
+ const doSearch=()=>renderDocumentList(kind,userId,(document.querySelector<HTMLInputElement>('#document-search')!).value)
+ document.querySelector('#search-document')!.addEventListener('click',doSearch)
+ document.querySelector<HTMLInputElement>('#document-search')!.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();doSearch()}})
+ document.querySelectorAll<HTMLElement>('[data-doc-id]').forEach(el=>el.addEventListener('click',()=>showDocument(el.dataset.docKind as 'incoming'|'outgoing',el.dataset.docId!,userId)))
 }
 
 async function renderDashboard(userId:string,view:View='dashboard'){
  if(view==='users'){await renderUsers(userId);return}
- const [p,inc,out,tasks,roles]=await Promise.all([loadProfile(userId),supabase.from('incoming_documents').select('id,document_no,received_date,subject,status').order('received_date',{ascending:false}).limit(20),supabase.from('outgoing_documents').select('id,document_no,document_date,subject,status').order('document_date',{ascending:false}).limit(20),supabase.from('assignments').select('id,due_date,status,note').eq('assigned_to',userId).neq('status','completed').order('due_date').limit(20),supabase.from('user_roles').select('roles(name)').eq('user_id',userId)]);
- const role=(roles.data?.[0] as any)?.roles?.name||'ผู้ใช้งาน';let content='';
- if(view==='dashboard')content='<section class="welcome"><h1>สวัสดี '+esc(p?.full_name||'ผู้ใช้งาน')+'</h1><p class="muted">บทบาท: '+esc(role)+'</p></section><section class="stats"><article><span>หนังสือรับ</span><strong>'+ (inc.data?.length||0) +'</strong></article><article><span>หนังสือส่ง</span><strong>'+ (out.data?.length||0) +'</strong></article><article><span>งานค้าง</span><strong>'+ (tasks.data?.length||0) +'</strong></article></section><section class="grid"><article class="panel"><h2>หนังสือรับล่าสุด</h2>'+listRows(inc.data||[],'received_date','incoming')+'</article><article class="panel"><h2>หนังสือส่งล่าสุด</h2>'+listRows(out.data||[],'document_date','outgoing')+'</article></section>';
- if(view==='incoming')content='<section class="welcome"><h1>หนังสือรับ</h1><p class="muted">ทะเบียนหนังสือรับล่าสุด</p></section><section class="panel"><div class="table-head"><b>เลขทะเบียน</b><b>วันที่</b><b>เรื่อง</b><b>สถานะ</b></div>'+listRows(inc.data||[],'received_date')+'</section>';
- if(view==='outgoing')content='<section class="welcome"><h1>หนังสือส่ง</h1><p class="muted">ทะเบียนหนังสือส่งล่าสุด</p></section><section class="panel"><div class="table-head"><b>เลขทะเบียน</b><b>วันที่</b><b>เรื่อง</b><b>สถานะ</b></div>'+listRows(out.data||[],'document_date')+'</section>';
- if(view==='tasks')content='<section class="welcome"><h1>งานของฉัน</h1><p class="muted">งานที่ยังไม่เสร็จ</p></section><section class="panel">'+((tasks.data||[]).map((d:any)=>{const doc=d.incoming_documents||d.outgoing_documents;const kind=d.incoming_document_id?'incoming':'outgoing';return '<div class="row clickable" data-task-doc="'+esc(d.incoming_document_id||d.outgoing_document_id||'')+'" data-task-kind="'+kind+'"><b>'+esc(d.due_date||'-')+'</b><span>'+esc(doc?.document_no||'')+' — '+esc(doc?.subject||d.note||'งานเอกสาร')+'</span><small>'+esc(d.status)+'</small></div>'}).join('')||'<p class="muted">ไม่มีงานค้าง</p>')+'</section>';
- app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button data-view="dashboard">ภาพรวม</button><button data-view="incoming">หนังสือรับ</button><button data-view="outgoing">หนังสือส่ง</button><button data-view="tasks">งานของฉัน</button>'+(role==='ผู้ดูแลระบบ'?'<button data-view="users">ผู้ใช้งาน</button>':'')+'<hr><button id="new-in">＋ ลงทะเบียนหนังสือรับ</button><button id="new-out">＋ ลงทะเบียนหนังสือส่ง</button></aside><main class="page">'+content+'</main></div></div>';
- document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut());document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(b=>b.onclick=()=>renderDashboard(userId,b.dataset.view as View));document.querySelector('#new-in')!.addEventListener('click',()=>documentForm('incoming',userId));document.querySelector('#new-out')!.addEventListener('click',()=>documentForm('outgoing',userId))
+ if(view==='incoming'||view==='outgoing'){await renderDocumentList(view,userId);return}
+ const [p,inc,out,tasks,roles]=await Promise.all([
+  loadProfile(userId),
+  supabase.from('incoming_documents').select('id,document_no,received_date,subject,status').order('received_date',{ascending:false}).limit(10),
+  supabase.from('outgoing_documents').select('id,document_no,document_date,subject,status').order('document_date',{ascending:false}).limit(10),
+  supabase.from('assignments').select('id,incoming_document_id,outgoing_document_id,due_date,status,note,incoming_documents(document_no,subject),outgoing_documents(document_no,subject)').eq('assigned_to',userId).neq('status','completed').order('due_date').limit(20),
+  supabase.from('user_roles').select('roles(name)').eq('user_id',userId)
+ ])
+ const role=(roles.data?.[0] as any)?.roles?.name||'ผู้ใช้งาน'
+ let content=''
+ if(view==='dashboard')content='<section class="welcome"><h1>สวัสดี '+esc(p?.full_name||'ผู้ใช้งาน')+'</h1><p class="muted">บทบาท: '+esc(role)+'</p></section><section class="stats"><article><span>หนังสือรับล่าสุด</span><strong>'+ (inc.data?.length||0) +'</strong></article><article><span>หนังสือส่งล่าสุด</span><strong>'+ (out.data?.length||0) +'</strong></article><article><span>งานค้าง</span><strong>'+ (tasks.data?.length||0) +'</strong></article></section><section class="grid"><article class="panel"><h2>หนังสือรับล่าสุด</h2>'+listRows(inc.data||[],'received_date','incoming')+'</article><article class="panel"><h2>หนังสือส่งล่าสุด</h2>'+listRows(out.data||[],'document_date','outgoing')+'</article></section>'
+ if(view==='tasks')content='<section class="welcome"><h1>งานของฉัน</h1><p class="muted">งานที่ยังไม่เสร็จ</p></section><section class="panel">'+((tasks.data||[]).map((d:any)=>{const doc=d.incoming_documents||d.outgoing_documents;const kind=d.incoming_document_id?'incoming':'outgoing';return '<div class="row clickable" data-task-doc="'+esc(d.incoming_document_id||d.outgoing_document_id||'')+'" data-task-kind="'+kind+'"><b>'+esc(d.due_date||'-')+'</b><span>'+esc(doc?.document_no||'')+' — '+esc(doc?.subject||d.note||'งานเอกสาร')+'</span><small>'+esc(d.status)+'</small></div>'}).join('')||'<p class="muted">ไม่มีงานค้าง</p>')+'</section>'
+ app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button data-view="dashboard">ภาพรวม</button><button data-view="incoming">หนังสือรับ</button><button data-view="outgoing">หนังสือส่ง</button><button data-view="tasks">งานของฉัน</button>'+(role==='ผู้ดูแลระบบ'?'<button data-view="users">ผู้ใช้งาน</button>':'')+'<hr><button id="new-in">＋ ลงทะเบียนหนังสือรับ</button><button id="new-out">＋ ลงทะเบียนหนังสือส่ง</button></aside><main class="page">'+content+'</main></div></div>'
+ document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
+ document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(b=>b.onclick=()=>renderDashboard(userId,b.dataset.view as View))
+ document.querySelector('#new-in')!.addEventListener('click',()=>documentForm('incoming',userId))
+ document.querySelector('#new-out')!.addEventListener('click',()=>documentForm('outgoing',userId))
  document.querySelectorAll<HTMLElement>('[data-doc-id]').forEach(el=>el.addEventListener('click',()=>showDocument(el.dataset.docKind as 'incoming'|'outgoing',el.dataset.docId!,userId)))
+ document.querySelectorAll<HTMLElement>('[data-task-doc]').forEach(el=>el.addEventListener('click',()=>showDocument(el.dataset.taskKind as 'incoming'|'outgoing',el.dataset.taskDoc!,userId)))
 }
 
 
