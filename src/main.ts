@@ -81,8 +81,21 @@ async function showDocument(kind:'incoming'|'outgoing',id:string,userId:string){
  document.querySelectorAll<HTMLButtonElement>('[data-task]').forEach(b=>b.onclick=async()=>{const {error}=await supabase.from('assignments').update({status:'completed'}).eq('id',b.dataset.task!);if(error)alert('อัปเดตงานไม่สำเร็จ: '+error.message);else await showDocument(kind,id,userId)})
 }
 
+async function invokeAdminUsers(body:any){
+  let {data:{session}}=await supabase.auth.getSession()
+  if(!session){
+    const refreshed=await supabase.auth.refreshSession()
+    session=refreshed.data.session
+  }
+  if(!session)return {data:null,error:new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่')}
+  return supabase.functions.invoke('admin-users',{
+    body,
+    headers:{Authorization:'Bearer '+session.access_token},
+  })
+}
+
 async function renderUsers(userId:string){
- const {data,error}=await supabase.functions.invoke('admin-users',{body:{action:'list'}})
+ const {data,error}=await invokeAdminUsers({action:'list'})
  if(error||!data){alert('โหลดผู้ใช้งานไม่สำเร็จ: '+(error?.message||'เกิดข้อผิดพลาด'));return}
  const users=(data.users||[]) as any[]
  const roleLabel=(code:string)=>({admin:'ผู้ดูแลระบบ',director:'ผู้อำนวยการ',officer:'เจ้าหน้าที่สารบรรณ',staff:'ผู้ใช้งาน'})[code]||code
@@ -99,7 +112,7 @@ async function renderUsers(userId:string){
    e.preventDefault()
    const fd=new FormData(e.currentTarget)
    const m=document.querySelector('#users-message')!
-   const {error}=await supabase.functions.invoke('admin-users',{body:{action:'invite',full_name:fd.get('full_name'),email:fd.get('email'),role_code:fd.get('role_code')}})
+   const {error}=await invokeAdminUsers({action:'invite',full_name:fd.get('full_name'),email:fd.get('email'),role_code:fd.get('role_code')})
    if(error){m.textContent='ส่งคำเชิญไม่สำเร็จ: '+error.message;m.className='error';return}
    m.textContent='ส่งคำเชิญเรียบร้อย ผู้ใช้งานจะได้รับอีเมลเพื่อเข้าระบบ';m.className='success'
    e.currentTarget.reset()
@@ -110,13 +123,13 @@ async function renderUsers(userId:string){
    const fullName=prompt('ชื่อผู้ใช้งาน',u.full_name||'');if(fullName===null)return
    const current=u.roles?.[0]?.code||'staff'
    const roleCode=prompt('บทบาท: admin / director / officer / staff',current);if(roleCode===null)return
-   const {error}=await supabase.functions.invoke('admin-users',{body:{action:'update',user_id:u.id,full_name:fullName,role_code:roleCode}})
+   const {error}=await invokeAdminUsers({action:'update',user_id:u.id,full_name:fullName,role_code:roleCode})
    if(error)alert('แก้ไขไม่สำเร็จ: '+error.message);else await renderUsers(userId)
  })
  document.querySelectorAll<HTMLButtonElement>('[data-delete-user]').forEach(b=>b.onclick=async()=>{
    const u=users.find(x=>x.id===b.dataset.deleteUser);if(!u)return
    if(!confirm('ยืนยันการลบบัญชี '+(u.full_name||u.email)+' ?'))return
-   const {error}=await supabase.functions.invoke('admin-users',{body:{action:'delete',user_id:u.id}})
+   const {error}=await invokeAdminUsers({action:'delete',user_id:u.id})
    if(error)alert('ลบผู้ใช้งานไม่สำเร็จ: '+error.message);else await renderUsers(userId)
  })
 }
