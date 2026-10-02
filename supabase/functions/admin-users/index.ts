@@ -1,10 +1,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.117.2'
+import { corsHeaders } from 'npm:@supabase/supabase-js@2.117.2/cors'
 
 const PRODUCTION_URL = 'https://anuban-chumsang-document-system.60010106nkw1.workers.dev'
 const ALLOWED_ROLES = new Set(['admin', 'director', 'officer', 'staff'])
 
 function response(data: unknown, status = 200) {
-  return Response.json(data, { status })
+  return Response.json(data, {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
 }
 
 async function getAdminContext(req: Request) {
@@ -16,7 +20,11 @@ async function getAdminContext(req: Request) {
   let secretKey = ''
   try {
     const keys = JSON.parse(raw)
-    secretKey = keys.default ?? Object.values(keys)[0] ?? ''
+    const keyRef = keys.default ?? Object.values(keys)[0] ?? ''
+    secretKey = Deno.env.get(String(keyRef)) ?? ''
+    if (!secretKey && typeof keyRef === 'string' && keyRef.startsWith('sb_secret_')) {
+      secretKey = keyRef
+    }
   } catch {
     secretKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   }
@@ -28,7 +36,7 @@ async function getAdminContext(req: Request) {
 
   const { data: userData, error: userError } = await admin.auth.getUser(match[1])
   if (userError || !userData.user) {
-    console.error('user JWT validation failed', userError)
+    console.error('user JWT validation failed', userError?.message ?? 'user not found')
     return { ok: false as const, status: 401, message: 'เซสชันไม่ถูกต้องหรือหมดอายุ กรุณาเข้าสู่ระบบใหม่' }
   }
 
@@ -36,7 +44,7 @@ async function getAdminContext(req: Request) {
   const { data: userRoleRows, error: roleError } = await admin
     .from('user_roles').select('role_id').eq('user_id', userId)
   if (roleError) {
-    console.error('role lookup failed', roleError)
+    console.error('role lookup failed', roleError.message)
     return { ok: false as const, status: 500, message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' }
   }
 
@@ -46,7 +54,7 @@ async function getAdminContext(req: Request) {
   const { data: permissionRows, error: permissionError } = await admin
     .from('role_permissions').select('role_id,permissions!inner(code)').in('role_id', roleIds)
   if (permissionError) {
-    console.error('permission lookup failed', permissionError)
+    console.error('permission lookup failed', permissionError.message)
     return { ok: false as const, status: 500, message: 'ตรวจสอบสิทธิ์ไม่สำเร็จ' }
   }
 
@@ -70,7 +78,7 @@ async function listUsers(admin: any) {
   ])
 
   if (profileError || roleError) {
-    console.error('user data query failed', profileError ?? roleError)
+    console.error('user data query failed', profileError?.message ?? roleError?.message)
     return response({ error: 'โหลดข้อมูลผู้ใช้งานไม่สำเร็จ' }, 500)
   }
 
@@ -176,6 +184,10 @@ async function deleteUser(admin: any, actorId: string, body: any) {
 
 export default {
   async fetch(req: Request) {
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders })
+    }
+
     try {
       const auth = await getAdminContext(req)
       if (!auth.ok) return response({ error: auth.message }, auth.status)
