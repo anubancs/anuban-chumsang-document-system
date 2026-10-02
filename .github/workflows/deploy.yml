@@ -22,12 +22,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - run: npm install
       - run: npm run build
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_URL: https://uwebbofczidcfnjbvsqu.supabase.co
+          VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_3xMsRwdyNUhPsnJiH34O9w_hnF8BUiV
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
