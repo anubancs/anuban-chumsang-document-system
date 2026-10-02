@@ -1,5 +1,7 @@
 import { defineConfig } from 'vite'
+import { cloudflare } from '@cloudflare/vite-plugin'
 
 export default defineConfig({
-  base: '/anuban-chumsang-document-system/',
+  plugins: [cloudflare()],
+  base: '/',
 })
