@@ -41,5 +41,7 @@ async function renderDashboard(userId:string,view:View='dashboard'){
  document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut());document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(b=>b.onclick=()=>renderDashboard(userId,b.dataset.view as View));document.querySelector('#new-in')!.addEventListener('click',()=>documentForm('incoming',userId));document.querySelector('#new-out')!.addEventListener('click',()=>documentForm('outgoing',userId))
 }
 
-async function boot(){const {data:{session}}=await supabase.auth.getSession();if(session?.user)await renderDashboard(session.user.id);else renderLogin();supabase.auth.onAuthStateChange(async(_,s)=>{if(s?.user)await renderDashboard(s.user.id);else renderLogin()})}
+async function ensureFirstAdmin(userId:string){const {data:roles}=await supabase.from('user_roles').select('role_id').eq('user_id',userId).limit(1);if(roles&&roles.length)return;const {data:r}=await supabase.from('roles').select('id').eq('code','admin').single();if(r)await supabase.from('user_roles').insert({user_id:userId,role_id:r.id,assigned_by:userId})}
+
+async function boot(){const {data:{session}}=await supabase.auth.getSession();if(session?.user){await ensureFirstAdmin(session.user.id);await renderDashboard(session.user.id)}else renderLogin();supabase.auth.onAuthStateChange(async(_,s)=>{if(s?.user){await ensureFirstAdmin(s.user.id);await renderDashboard(s.user.id)}else renderLogin()})}
 boot()
