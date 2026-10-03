@@ -2,11 +2,8 @@ begin;
 
 select plan(11);
 
--- Self-contained fixture: never depend on a real/production user.
--- Disable the production auth trigger only inside this transaction so the
--- fixture can provide its own profile row. The ALTER TABLE is rolled back too.
-alter table auth.users disable trigger on_auth_user_created;
-
+-- Use the project's own auth.users trigger to create the profile and initial admin role.
+-- Everything is inside the test transaction and is rolled back by pgTAP.
 insert into auth.users (
   id, aud, role, email, email_confirmed_at, created_at, updated_at,
   raw_app_meta_data, raw_user_meta_data
@@ -19,22 +16,6 @@ values (
   now(), now(), now(),
   '{}'::jsonb, '{}'::jsonb
 );
-
-insert into public.profiles (id, full_name, email, is_active)
-values (
-  '00000000-0000-0000-0000-000000000001'::uuid,
-  'RBAC Test User',
-  'rbac-test@example.invalid',
-  true
-);
-
-insert into public.user_roles (user_id, role_id)
-values (
-  '00000000-0000-0000-0000-000000000001'::uuid,
-  (select id from public.roles where code='admin')
-);
-
-alter table auth.users enable trigger on_auth_user_created;
 
 select set_config(
   'request.jwt.claim.sub',
