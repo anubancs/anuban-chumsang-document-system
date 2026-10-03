@@ -112,7 +112,7 @@ async function inviteUser(admin: any, actorId: string, body: any) {
   if (!ALLOWED_ROLES.has(roleCode)) return response({ error: 'บทบาทไม่ถูกต้อง' }, 400)
 
   const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
-    data: { full_name: fullName }, redirectTo: PRODUCTION_URL,
+    data: { full_name: fullName }, redirectTo: PRODUCTION_URL + '?type=invite',
   })
   if (error || !data.user) return response({ error: error?.message ?? 'สร้างคำเชิญไม่สำเร็จ' }, 400)
 
