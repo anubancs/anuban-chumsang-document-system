@@ -107,15 +107,18 @@ Deno.serve(async (req: Request) => {
 
   const documentType = String(form.get("document_type") || "");
   const documentId = String(form.get("document_id") || "");
-  const file = form.get("file");
+  const files = form.getAll("file").filter((value): value is File => value instanceof File);
 
-  if (!["incoming", "outgoing"].includes(documentType) || !documentId || !(file instanceof File)) {
-    return json({ error: "document_type, document_id and file are required" }, 400);
+  if (!["incoming", "outgoing"].includes(documentType) || !documentId || !files.length) {
+    return json({ error: "document_type, document_id and at least one file are required" }, 400);
   }
 
-  if (file.size <= 0) return json({ error: "Empty file is not allowed" }, 400);
-  if (file.size > MAX_FILE_SIZE) {
-    return json({ error: "File is too large. Maximum size is 20 MB." }, 413);
+  const emptyFile = files.find((file) => file.size <= 0);
+  if (emptyFile) return json({ error: "Empty file is not allowed: " + emptyFile.name }, 400);
+
+  const oversizedFile = files.find((file) => file.size > MAX_FILE_SIZE);
+  if (oversizedFile) {
+    return json({ error: "File is too large (maximum 20 MB): " + oversizedFile.name }, 413);
   }
 
   const service = createClient(supabaseUrl, serviceRoleKey);
@@ -170,44 +173,56 @@ Deno.serve(async (req: Request) => {
 
   try {
     const accessToken = await getGoogleAccessToken();
-    const driveFile = await uploadToDrive(file, accessToken, parentId);
+    const uploadedDriveFiles: any[] = [];
 
-    const row = {
-      incoming_document_id: documentType === "incoming" ? documentId : null,
-      outgoing_document_id: documentType === "outgoing" ? documentId : null,
-      file_name: file.name,
-      mime_type: file.type || driveFile.mimeType || "application/octet-stream",
-      file_size: file.size,
-      drive_file_id: driveFile.id,
-      drive_web_url: driveFile.webViewLink || `https://drive.google.com/file/d/${driveFile.id}/view`,
-      drive_parent_id: parentId,
-      uploaded_by: user.id,
-    };
-
-    const { data: saved, error: saveError } = await service
-      .from("document_files")
-      .insert(row)
-      .select("id,file_name,mime_type,file_size,drive_file_id,drive_web_url,created_at")
-      .single();
-
-    if (saveError) {
-      // Best-effort cleanup prevents an orphaned Drive file when the database
-      // metadata insert fails after the external upload already succeeded.
-      try {
-        await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFile.id)}`, {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-      } catch (cleanupError) {
-        console.error("Drive orphan cleanup failed", cleanupError);
+    try {
+      for (const file of files) {
+        const driveFile = await uploadToDrive(file, accessToken, parentId);
+        uploadedDriveFiles.push(driveFile);
       }
 
+      const rows = uploadedDriveFiles.map((driveFile, index) => {
+        const file = files[index];
+        return {
+          incoming_document_id: documentType === "incoming" ? documentId : null,
+          outgoing_document_id: documentType === "outgoing" ? documentId : null,
+          file_name: file.name,
+          mime_type: file.type || driveFile.mimeType || "application/octet-stream",
+          file_size: file.size,
+          drive_file_id: driveFile.id,
+          drive_web_url: driveFile.webViewLink || `https://drive.google.com/file/d/${driveFile.id}/view`,
+          drive_parent_id: parentId,
+          uploaded_by: user.id,
+        };
+      });
+
+      const { data: saved, error: saveError } = await service
+        .from("document_files")
+        .insert(rows)
+        .select("id,file_name,mime_type,file_size,drive_file_id,drive_web_url,created_at");
+
+      if (saveError) {
+        throw new Error("Drive upload succeeded but metadata save failed: " + saveError.message);
+      }
+
+      return json({ ok: true, files: saved ?? [], count: saved?.length ?? 0 });
+    } catch (error) {
+      for (const driveFile of uploadedDriveFiles) {
+        try {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFile.id)}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+        } catch (cleanupError) {
+          console.error("Drive orphan cleanup failed", cleanupError);
+        }
+      }
+
+      console.error("drive-file batch upload failed", error);
       return json({
-        error: "Drive upload succeeded but metadata save failed",
+        error: error instanceof Error ? error.message : "Google Drive upload failed",
       }, 500);
     }
-
-    return json({ ok: true, file: saved });
   } catch (error) {
     console.error("drive-file error", error);
     return json({
