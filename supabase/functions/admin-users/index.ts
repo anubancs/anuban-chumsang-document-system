@@ -73,7 +73,7 @@ async function listUsers(admin: any) {
 
   const ids = users.map((u: any) => u.id)
   const [{ data: profiles, error: profileError }, { data: assignments, error: roleError }] = await Promise.all([
-    admin.from('profiles').select('id,full_name,email').in('id', ids),
+    admin.from('profiles').select('id,full_name,email,leave_policy').in('id', ids),
     admin.from('user_roles').select('user_id,roles!inner(code,name)').in('user_id', ids),
   ])
 
@@ -98,6 +98,7 @@ async function listUsers(admin: any) {
       confirmed: Boolean(u.email_confirmed_at),
       last_sign_in_at: u.last_sign_in_at,
       created_at: u.created_at,
+      leave_policy: profileMap.get(u.id)?.leave_policy ?? 'other',
       roles: roleMap.get(u.id) ?? [],
     })),
   })
@@ -121,7 +122,7 @@ async function inviteUser(admin: any, actorId: string, body: any) {
   if (roleError || !role) return response({ error: 'ไม่พบบทบาทที่เลือก' }, 500)
 
   const { error: profileError } = await admin.from('profiles')
-    .upsert({ id: data.user.id, full_name: fullName, email }, { onConflict: 'id' })
+    .upsert({ id: data.user.id, full_name: fullName, email, leave_policy: 'other' }, { onConflict: 'id' })
   if (profileError) return response({ error: 'สร้างโปรไฟล์ไม่สำเร็จ: ' + profileError.message }, 500)
 
   const { error: assignmentError } = await admin.from('user_roles')
@@ -161,6 +162,31 @@ async function updateUser(admin: any, actorId: string, body: any) {
   if (assignmentError) return response({ error: 'เปลี่ยนบทบาทไม่สำเร็จ: ' + assignmentError.message }, 500)
 
   return response({ ok: true })
+}
+
+async function setLeavePolicy(admin: any, actorId: string, body: any) {
+  const targetId = String(body.user_id ?? '').trim()
+  const policy = String(body.leave_policy ?? '').trim()
+  const allowedPolicies = new Set(['teacher_civil_servant', 'government_employee', 'other'])
+  if (!targetId || !allowedPolicies.has(policy)) return response({ error: 'ประเภทสิทธิการลาไม่ถูกต้อง' }, 400)
+
+  const { data: target, error: targetError } = await admin.from('profiles').select('id,leave_policy').eq('id', targetId).maybeSingle()
+  if (targetError || !target) return response({ error: 'ไม่พบโปรไฟล์ผู้ใช้งาน' }, 404)
+
+  const { error } = await admin.from('profiles').update({ leave_policy: policy }).eq('id', targetId)
+  if (error) return response({ error: 'บันทึกประเภทสิทธิการลาไม่สำเร็จ: ' + error.message }, 400)
+
+  const { error: auditError } = await admin.from('audit_logs').insert({
+    actor_id: actorId,
+    action: 'update',
+    entity_type: 'profiles',
+    entity_id: targetId,
+    old_data: { leave_policy: target.leave_policy ?? 'other' },
+    new_data: { leave_policy: policy },
+  })
+  if (auditError) console.error('leave policy audit log failed', auditError.message)
+
+  return response({ ok: true, leave_policy: policy })
 }
 
 async function resetPassword(admin: any, actorId: string, body: any) {
@@ -222,6 +248,7 @@ export default {
       if (body.action === 'invite') return inviteUser(auth.admin, auth.userId, body)
       if (body.action === 'update') return updateUser(auth.admin, auth.userId, body)
       if (body.action === 'reset_password') return resetPassword(auth.admin, auth.userId, body)
+      if (body.action === 'set_leave_policy') return setLeavePolicy(auth.admin, auth.userId, body)
       if (body.action === 'delete') return deleteUser(auth.admin, auth.userId, body)
       return response({ error: 'ไม่รู้จักคำสั่ง' }, 400)
     } catch (error) {
