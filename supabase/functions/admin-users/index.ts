@@ -163,6 +163,31 @@ async function updateUser(admin: any, actorId: string, body: any) {
   return response({ ok: true })
 }
 
+async function resetPassword(admin: any, actorId: string, body: any) {
+  const targetId = String(body.user_id ?? '').trim()
+  const password = String(body.password ?? '')
+  if (!targetId) return response({ error: 'ไม่พบผู้ใช้งาน' }, 400)
+  if (password.length < 6) return response({ error: 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร' }, 400)
+
+  const { data: target, error: targetError } = await admin.auth.admin.getUserById(targetId)
+  if (targetError || !target.user) return response({ error: 'ไม่พบผู้ใช้งานในระบบ Auth' }, 404)
+
+  const { error } = await admin.auth.admin.updateUserById(targetId, { password })
+  if (error) return response({ error: 'ตั้งรหัสผ่านใหม่ไม่สำเร็จ: ' + error.message }, 400)
+
+  const { error: auditError } = await admin.from('audit_logs').insert({
+    actor_id: actorId,
+    action: 'update',
+    entity_type: 'auth_users',
+    entity_id: targetId,
+    old_data: { email: target.user.email ?? null },
+    new_data: { action: 'admin_password_reset', email: target.user.email ?? null },
+  })
+  if (auditError) console.error('password reset audit log failed', auditError.message)
+
+  return response({ ok: true })
+}
+
 async function deleteUser(admin: any, actorId: string, body: any) {
   const targetId = String(body.user_id ?? '')
   if (!targetId) return response({ error: 'ไม่พบผู้ใช้งาน' }, 400)
@@ -196,6 +221,7 @@ export default {
       if (body.action === 'list') return listUsers(auth.admin)
       if (body.action === 'invite') return inviteUser(auth.admin, auth.userId, body)
       if (body.action === 'update') return updateUser(auth.admin, auth.userId, body)
+      if (body.action === 'reset_password') return resetPassword(auth.admin, auth.userId, body)
       if (body.action === 'delete') return deleteUser(auth.admin, auth.userId, body)
       return response({ error: 'ไม่รู้จักคำสั่ง' }, 400)
     } catch (error) {
