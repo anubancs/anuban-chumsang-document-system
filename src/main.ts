@@ -178,6 +178,20 @@ async function renderUsers(userId:string){
    const {error}=await invokeAdminUsers({action:'update',user_id:u.id,full_name:fullName,role_code:roleCode})
    if(error)alert('แก้ไขไม่สำเร็จ: '+await functionErrorMessage(error));else await renderUsers(userId)
  })
+ document.querySelectorAll<HTMLButtonElement>('[data-reset-password-user]').forEach(b=>b.onclick=async()=>{
+   const u=users.find(x=>x.id===b.dataset.resetPasswordUser);if(!u)return
+   const label=u.full_name||u.email||'ผู้ใช้งาน'
+   if(!confirm('ยืนยันว่าต้องการให้ผู้ดูแลระบบตั้งรหัสผ่านใหม่ให้ '+label+' ?'))return
+   const password=prompt('กรอกรหัสผ่านใหม่สำหรับ '+label+' (อย่างน้อย 6 ตัวอักษร)')
+   if(password===null)return
+   if(password.length<6){alert('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');return}
+   const confirmPassword=prompt('กรอกรหัสผ่านใหม่อีกครั้งเพื่อยืนยัน')
+   if(confirmPassword===null)return
+   if(password!==confirmPassword){alert('รหัสผ่านทั้งสองครั้งไม่ตรงกัน');return}
+   const {error}=await invokeAdminUsers({action:'reset_password',user_id:u.id,password})
+   if(error)alert('ตั้งรหัสผ่านใหม่ไม่สำเร็จ: '+await functionErrorMessage(error))
+   else{alert('ตั้งรหัสผ่านใหม่ให้ '+label+' เรียบร้อยแล้ว\nกรุณาแจ้งรหัสผ่านใหม่แก่ผู้ใช้งานผ่านช่องทางที่ปลอดภัย');await renderUsers(userId)}
+ })
  document.querySelectorAll<HTMLButtonElement>('[data-delete-user]').forEach(b=>b.onclick=async()=>{
    const u=users.find(x=>x.id===b.dataset.deleteUser);if(!u)return
    if(!confirm('ยืนยันการลบบัญชี '+(u.full_name||u.email)+' ?'))return
