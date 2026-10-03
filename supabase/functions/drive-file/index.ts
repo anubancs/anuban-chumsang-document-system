@@ -128,7 +128,42 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (documentError || !document) return json({ error: "Document not found" }, 404);
-  if (document.created_by !== user.id) return json({ error: "Forbidden" }, 403);
+
+  // The UI permits attachment uploads for users who can update documents.
+  // Resolve that permission from the canonical RBAC tables instead of trusting
+  // client-side role checks. The document creator is also allowed for backwards
+  // compatibility with records created before RBAC was hardened.
+  let canUpdateDocuments = document.created_by === user.id;
+  if (!canUpdateDocuments) {
+    const { data: roleRows, error: roleError } = await service
+      .from("user_roles")
+      .select("role_id")
+      .eq("user_id", user.id);
+
+    if (roleError) {
+      console.error("upload permission role lookup failed", roleError.message);
+      return json({ error: "ตรวจสอบสิทธิ์ไม่สำเร็จ" }, 500);
+    }
+
+    const roleIds = (roleRows ?? []).map((row: { role_id: string }) => row.role_id);
+    if (roleIds.length) {
+      const { data: permissionRows, error: permissionError } = await service
+        .from("role_permissions")
+        .select("role_id,permissions!inner(code)")
+        .in("role_id", roleIds);
+
+      if (permissionError) {
+        console.error("upload permission lookup failed", permissionError.message);
+        return json({ error: "ตรวจสอบสิทธิ์ไม่สำเร็จ" }, 500);
+      }
+
+      canUpdateDocuments = (permissionRows ?? []).some(
+        (row: any) => row.permissions?.code === "documents.update",
+      );
+    }
+  }
+
+  if (!canUpdateDocuments) return json({ error: "Forbidden" }, 403);
 
   const parentId = Deno.env.get("GOOGLE_DRIVE_FOLDER_ID");
   if (!parentId) return json({ error: "Google Drive folder is not configured" }, 500);
@@ -156,9 +191,19 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (saveError) {
+      // Best-effort cleanup prevents an orphaned Drive file when the database
+      // metadata insert fails after the external upload already succeeded.
+      try {
+        await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(driveFile.id)}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+      } catch (cleanupError) {
+        console.error("Drive orphan cleanup failed", cleanupError);
+      }
+
       return json({
         error: "Drive upload succeeded but metadata save failed",
-        drive_file_id: driveFile.id,
       }, 500);
     }
 
