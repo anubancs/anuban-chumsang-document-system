@@ -221,8 +221,8 @@ async function getLeaveLegalPreview(userId:string,leaveType:string,start:string,
  const fy=fiscalResult.data as number;
  let used=0;
  if(leaveType==='personal'||leaveType==='sick'){
-   const {data}=await supabase.from('leave_requests').select('counted_days').eq('requested_by',userId).eq('fiscal_year',fy).eq('leave_type',leaveType).in('status',['pending','approved']);
-   used=(data||[]).reduce((sum:any,row:any)=>sum+Number(row.counted_days||0),0);
+   const usedResult=await supabase.rpc('leave_used_working_days',{p_user:userId,p_type:leaveType,p_fiscal_year:fy});
+   used=Number(usedResult.data||0);
  }
  return {days:Number(daysResult.data||0),used,notice:String(noticeResult.data||''),fiscalYear:fy};
 }
@@ -236,7 +236,7 @@ async function refreshLeaveLegalPreview(userId:string){
  const ack=document.querySelector<HTMLInputElement>('#leave-legal-ack');
  if(!start||!end||end<start){daysEl.textContent='';noticeEl.textContent='';if(ack)ack.closest('label')!.style.display='none';return}
  const p=await getLeaveLegalPreview(userId,type,start,end);
- daysEl.textContent=type==='official'||type==='outside_school'?'ไม่หักวันลา':('วันลาที่นับตามราชการ: '+p.days+' วันทำการ · ใช้ไปแล้ว: '+p.used+' วัน · ปีงบประมาณ '+p.fiscalYear);
+ daysEl.textContent=type==='official'||type==='outside_school'?'ไม่หักวันลา':('วันลาที่นับตามราชการ: '+p.days+' วันทำการ · ใช้ไปแล้ว: '+p.used+' วัน · ปีงบประมาณ '+(p.fiscalYear+543));
  noticeEl.textContent=p.notice;
  noticeEl.className=(p.notice.includes('เกิน')?'error':'muted');
  if(ack){ack.closest('label')!.style.display=p.notice.includes('เกิน')?'block':'none';ack.checked=false}
