@@ -27,8 +27,6 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
 
-      - name: TypeScript parser diagnostics
-        run: node -e "const ts=require('typescript');const fs=require('fs');const s=fs.readFileSync('src/main.ts','utf8');const f=ts.createSourceFile('src/main.ts',s,ts.ScriptTarget.Latest,true);for(const d of f.parseDiagnostics){const p=f.getLineAndCharacterOfPosition(d.start||0);console.log(d.messageText+' @ '+(p.line+1)+':'+(p.character+1))}"
       - name: Build
         run: npm run build
         env:
