@@ -25,7 +25,7 @@ async function uploadDocumentFile(documentType:'incoming'|'outgoing',documentId:
   try{
     const response=await fetch(functionUrl,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:'sb_publishable_3xMsRwdyNUhPsnJiH34O9w_hnF8BUiV'},body})
     const result=await response.json().catch(()=>({}))
-    if(!response.ok||!result.ok){m.textContent='อัปโหลดไฟล์ไม่สำเร็จ: '+(result.message||'เกิดข้อผิดพลาด');m.className='full error';return false}
+    if(!response.ok||!result.ok){m.textContent='อัปโหลดไฟล์ไม่สำเร็จ: '+(result.error||result.message||'เกิดข้อผิดพลาด');m.className='full error';return false}
     m.textContent='อัปโหลดไฟล์ไป Google Drive สำเร็จ';m.className='full success';return true
   }catch(error){
     m.textContent='เชื่อมต่อ Google Drive ไม่สำเร็จ: '+(error instanceof Error?error.message:'เกิดข้อผิดพลาด');m.className='full error';return false
