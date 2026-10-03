@@ -187,8 +187,8 @@ async function renderUsers(userId:string){
    if(policy===null)return
    const normalized=policy.trim()
    if(!['teacher_civil_servant','government_employee','other'].includes(normalized)){alert('ค่าที่เลือกไม่ถูกต้อง');return}
-   const {error}=await invokeAdminUsers({action:'set_leave_policy',user_id:u.id,leave_policy:normalized})
-   if(error)alert('เปลี่ยนสิทธิการลาไม่สำเร็จ: '+await functionErrorMessage(error));else await renderUsers(userId)
+   const {error}=await supabase.from('profiles').update({leave_policy:normalized}).eq('id',u.id)
+   if(error)alert('เปลี่ยนสิทธิการลาไม่สำเร็จ: '+error.message);else await renderUsers(userId)
  })
  document.querySelectorAll<HTMLButtonElement>('[data-reset-password-user]').forEach(b=>b.onclick=async()=>{
    const u=users.find(x=>x.id===b.dataset.resetPasswordUser);if(!u)return
