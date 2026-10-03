@@ -9,3 +9,6 @@
 .modal .panel{margin-top:16px}
 .small{padding:6px 10px;font-size:.85rem}
 @media(max-width:700px){.detail-grid{grid-template-columns:1fr}.modal-backdrop{padding:10px}.modal{max-height:calc(100vh - 20px)}.toolbar input{min-width:180px}}
+
+.leave-head,.leave-row{grid-template-columns:120px 150px 180px minmax(180px,1fr) 120px 180px;min-width:1000px}.leave-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.leave-actions button{white-space:nowrap}
+@media(max-width:800px){.leave-head,.leave-row{grid-template-columns:1fr 1fr;min-width:0}.leave-head b:nth-child(n+3){display:none}.leave-row>span:nth-child(n+3){grid-column:1/-1}.leave-actions{grid-column:1/-1}}
