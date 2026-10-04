@@ -151,14 +151,15 @@ async function renderUsers(userId:string){
  const {data,error}=await invokeAdminUsers({action:'list'})
  if(error||!data){alert('โหลดผู้ใช้งานไม่สำเร็จ: '+await functionErrorMessage(error));return}
  const users=(data.users||[]) as any[]
- const roleLabel=(code:string)=>({admin:'ผู้ดูแลระบบ',director:'ผู้อำนวยการ',officer:'เจ้าหน้าที่สารบรรณ',staff:'ผู้ใช้งาน'})[code]||code
+ const roleLabel=(code:string)=>({admin:'ผู้ดูแลระบบ',director:'ผู้อำนวยการ',deputy_director:'รองผู้อำนวยการโรงเรียน',officer:'เจ้าหน้าที่สารบรรณ',staff:'ผู้ใช้งาน'})[code]||code
  const rows=users.map(u=>{
    const role=u.roles?.[0]?.code||'staff'
    const leavePolicy=u.leave_policy||'other'
+   const position=u.position||''
    const leavePolicyLabel=({teacher_civil_servant:'ครู/บุคลากรทางการศึกษา',government_employee:'พนักงานราชการ/ลูกจ้างภาครัฐ',other:'อื่น ๆ'} as any)[leavePolicy]||'อื่น ๆ'
    return '<tr><td>'+esc(u.full_name||'-')+'</td><td>'+esc(u.email||'-')+'</td><td>'+esc(roleLabel(role))+'</td><td>'+esc(leavePolicyLabel)+'</td><td>'+ (u.confirmed?'ยืนยันแล้ว':'รอยืนยัน') +'</td><td><button class="secondary small" data-edit-user="'+esc(u.id)+'">แก้ไข</button> <button class="secondary small" data-leave-policy-user="'+esc(u.id)+'">สิทธิการลา</button> <button class="secondary small" data-reset-password-user="'+esc(u.id)+'">ตั้งรหัสผ่านใหม่</button> <button class="secondary small" data-delete-user="'+esc(u.id)+'">ลบ</button></td></tr>'
- }).join('')||'<tr><td colspan="6" class="muted">ยังไม่มีผู้ใช้งาน</td></tr>'
- app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button data-user-nav="dashboard">ภาพรวม</button><button data-user-nav="incoming">หนังสือรับ</button><button data-user-nav="outgoing">หนังสือส่ง</button><button data-user-nav="tasks">งานของฉัน</button><hr><button id="new-in">＋ ลงทะเบียนหนังสือรับ</button><button id="new-out">＋ ลงทะเบียนหนังสือส่ง</button><button class="active" data-user-nav="users">ผู้ใช้งาน</button></aside><main class="page"><section class="welcome"><h1>จัดการผู้ใช้งาน</h1><p class="muted">เพิ่ม แก้ไขบทบาท สิทธิการลา และลบบัญชีผู้ใช้งาน</p></section><section class="panel"><form id="invite-user-form" class="form-grid"><label>ชื่อผู้ใช้งาน<input name="full_name" required></label><label>อีเมล<input name="email" type="email" required></label><label>บทบาท<select name="role_code"><option value="staff">ผู้ใช้งาน</option><option value="officer">เจ้าหน้าที่สารบรรณ</option><option value="deputy_director">รองผู้อำนวยการโรงเรียน</option><option value="director">ผู้อำนวยการ</option><option value="admin">ผู้ดูแลระบบ</option></select></label><div class="actions"><button>ส่งคำเชิญ</button></div></form><p id="users-message"></p></section><section class="panel"><div class="table-wrap"><table><thead><tr><th>ชื่อ</th><th>อีเมล</th><th>บทบาท</th><th>สิทธิการลา</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>'+rows+'</tbody></table></div></section></main></div>'
+ }).join('')||'<tr><td colspan="7" class="muted">ยังไม่มีผู้ใช้งาน</td></tr>'
+ app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button data-user-nav="dashboard">ภาพรวม</button><button data-user-nav="incoming">หนังสือรับ</button><button data-user-nav="outgoing">หนังสือส่ง</button><button data-user-nav="tasks">งานของฉัน</button><hr><button id="new-in">＋ ลงทะเบียนหนังสือรับ</button><button id="new-out">＋ ลงทะเบียนหนังสือส่ง</button><button class="active" data-user-nav="users">ผู้ใช้งาน</button></aside><main class="page"><section class="welcome"><h1>จัดการผู้ใช้งาน</h1><p class="muted">เพิ่ม แก้ไขบทบาท สิทธิการลา และลบบัญชีผู้ใช้งาน</p></section><section class="panel"><form id="invite-user-form" class="form-grid"><label>ชื่อผู้ใช้งาน<input name="full_name" required></label><label>อีเมล<input name="email" type="email" required></label><label>บทบาท<select name="role_code"><option value="staff">ผู้ใช้งาน</option><option value="officer">เจ้าหน้าที่สารบรรณ</option><option value="deputy_director">รองผู้อำนวยการโรงเรียน</option><option value="director">ผู้อำนวยการ</option><option value="admin">ผู้ดูแลระบบ</option></select></label><label>ตำแหน่ง/หน้าที่<input name="position" placeholder="เช่น รองผู้อำนวยการโรงเรียน, ครู, เจ้าหน้าที่ธุรการ"></label><div class="actions"><button>ส่งคำเชิญ</button></div></form><p id="users-message"></p></section><section class="panel"><div class="table-wrap"><table><thead><tr><th>ชื่อ</th><th>อีเมล</th><th>บทบาท</th><th>ตำแหน่ง</th><th>สิทธิการลา</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody>'+rows+'</tbody></table></div></section></main></div>'
  document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
  document.querySelectorAll<HTMLButtonElement>('[data-user-nav]').forEach(b=>b.onclick=()=>renderDashboard(userId,b.dataset.userNav as View))
  document.querySelector('#new-in')!.addEventListener('click',()=>documentForm('incoming',userId))
@@ -167,7 +168,7 @@ async function renderUsers(userId:string){
    e.preventDefault()
    const fd=new FormData(e.currentTarget)
    const m=document.querySelector('#users-message')!
-   const {error}=await invokeAdminUsers({action:'invite',full_name:fd.get('full_name'),email:fd.get('email'),role_code:fd.get('role_code')})
+   const {error}=await invokeAdminUsers({action:'invite',full_name:fd.get('full_name'),email:fd.get('email'),role_code:fd.get('role_code'),position:fd.get('position')})
    if(error){m.textContent='ส่งคำเชิญไม่สำเร็จ: '+await functionErrorMessage(error);m.className='error';return}
    m.textContent='ส่งคำเชิญเรียบร้อย ผู้ใช้งานจะได้รับอีเมลเพื่อเข้าระบบ';m.className='success'
    e.currentTarget.reset()
@@ -177,8 +178,9 @@ async function renderUsers(userId:string){
    const u=users.find(x=>x.id===b.dataset.editUser);if(!u)return
    const fullName=prompt('ชื่อผู้ใช้งาน',u.full_name||'');if(fullName===null)return
    const current=u.roles?.[0]?.code||'staff'
-   const roleCode=prompt('บทบาท: admin / director / officer / staff',current);if(roleCode===null)return
-   const {error}=await invokeAdminUsers({action:'update',user_id:u.id,full_name:fullName,role_code:roleCode})
+   const roleCode=prompt('บทบาท: admin / director / deputy_director / officer / staff',current);if(roleCode===null)return
+   const position=prompt('ตำแหน่ง/หน้าที่',u.position||'');if(position===null)return
+   const {error}=await invokeAdminUsers({action:'update',user_id:u.id,full_name:fullName,role_code:roleCode,position:position.trim()})
    if(error)alert('แก้ไขไม่สำเร็จ: '+await functionErrorMessage(error));else await renderUsers(userId)
  })
  document.querySelectorAll<HTMLButtonElement>('[data-leave-policy-user]').forEach(b=>b.onclick=async()=>{
