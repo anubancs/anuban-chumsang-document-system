@@ -196,7 +196,7 @@ async function importUsers(admin: any, actorId: string, body: any) {
     const password=String(row.password??'').trim()||generateTemporaryPassword();
     const rowNo=i+2;
 
-    if(!/^\\S+@\\S+\\.\\S+$/.test(email)){failed.push({row:rowNo,email,error:'อีเมลไม่ถูกต้อง'});continue}
+    if(!/^\S+@\S+\.\S+$/.test(email)){failed.push({row:rowNo,email,error:'อีเมลไม่ถูกต้อง'});continue}
     if(!fullName){failed.push({row:rowNo,email,error:'ไม่มีชื่อผู้ใช้งาน'});continue}
     if(!ALLOWED_ROLES.has(roleCode)||!roleMap.get(roleCode)){failed.push({row:rowNo,email,error:'บทบาทไม่ถูกต้อง'});continue}
     if(!allowedPolicies.has(leavePolicy)){failed.push({row:rowNo,email,error:'สิทธิการลาไม่ถูกต้อง'});continue}
