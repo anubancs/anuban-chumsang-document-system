@@ -48,6 +48,8 @@ async function uploadDocumentFiles(documentType:'incoming'|'outgoing',documentId
     }
     if(!result?.ok){m.textContent='อัปโหลดไฟล์ไม่สำเร็จ: '+(result?.error||result?.message||'เกิดข้อผิดพลาด');m.className='full error';return false}
     m.textContent='อัปโหลดไฟล์แนบ '+files.length+' ไฟล์ไป Google Drive สำเร็จ';m.className='full success';return true
+  }catch(error){
+    m.textContent='เชื่อมต่อ Google Drive ไม่สำเร็จ: '+(error instanceof Error?error.message:'เกิดข้อผิดพลาด');m.className='full error';return false
   }
 }
 
