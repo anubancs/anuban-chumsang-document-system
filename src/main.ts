@@ -389,8 +389,6 @@ async function boot(){
    else await handleSession(session,false);
  }else{
    clearUiState();renderLogin();
- }lse{
-   renderLogin();
  }
 }
 
