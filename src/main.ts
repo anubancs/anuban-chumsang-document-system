@@ -37,12 +37,17 @@ async function uploadDocumentFiles(documentType:'incoming'|'outgoing',documentId
   if(!session){m.textContent='เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่';m.className='full error';return false}
   try{
     m.textContent='กำลังอัปโหลด '+files.length+' ไฟล์ไปยัง Google Drive...';m.className='full muted'
-    const response=await fetch(functionUrl,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||''},body})
-    const result=await response.json().catch(()=>({}))
-    if(!response.ok||!result.ok){m.textContent='อัปโหลดไฟล์ไม่สำเร็จ: '+(result.error||result.message||'เกิดข้อผิดพลาด');m.className='full error';return false}
+    const {data:result,error}=await supabase.functions.invoke('drive-file',{body})
+    if(error){
+      let detail=error.message||'เกิดข้อผิดพลาด'
+      const context=(error as any).context
+      if(context&&typeof context.json==='function'){
+        try{const payload=await context.json();detail=payload?.error||payload?.message||detail}catch{}
+      }
+      m.textContent='อัปโหลดไฟล์ไม่สำเร็จ: '+detail;m.className='full error';return false
+    }
+    if(!result?.ok){m.textContent='อัปโหลดไฟล์ไม่สำเร็จ: '+(result?.error||result?.message||'เกิดข้อผิดพลาด');m.className='full error';return false}
     m.textContent='อัปโหลดไฟล์แนบ '+files.length+' ไฟล์ไป Google Drive สำเร็จ';m.className='full success';return true
-  }catch(error){
-    m.textContent='เชื่อมต่อ Google Drive ไม่สำเร็จ: '+(error instanceof Error?error.message:'เกิดข้อผิดพลาด');m.className='full error';return false
   }
 }
 
