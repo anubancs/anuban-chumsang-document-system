@@ -292,9 +292,17 @@ async function updateLeaveStatus(userId:string,id:string,status:'approved'|'reje
  await renderLeaveList(userId);
 }
 async function cancelLeaveRequest(userId:string,id:string){
- if(!confirm('ยืนยันการยกเลิกคำขอลานี้?'))return;
- const {error}=await supabase.from('leave_requests').update({status:'cancelled'}).eq('id',id).eq('requested_by',userId).eq('status','pending');
+ const {data:leave,error:loadError}=await supabase.from('leave_requests').select('id,request_no,start_date,status').eq('id',id).eq('requested_by',userId).maybeSingle();
+ if(loadError||!leave){alert('ไม่พบคำขอลาที่สามารถยกเลิกได้');return}
+ if(!['pending','approved'].includes(leave.status)){alert('รายการนี้ไม่อยู่ในสถานะที่ยกเลิกได้');return}
+ if(leave.start_date<=today()){alert('สามารถยกเลิกได้เฉพาะก่อนวันเริ่มลาเท่านั้น');return}
+ const message=leave.status==='approved'
+   ? 'คำขอนี้อนุมัติแล้ว หากยกเลิกก่อนวันเริ่มลา จำนวนวันลาจะถูกคืนกลับไปคำนวณสิทธิ์โดยอัตโนมัติ\\n\\nยืนยันการยกเลิก '+leave.request_no+' ?'
+   : 'ยืนยันการยกเลิกคำขอ '+leave.request_no+' ?';
+ if(!confirm(message))return;
+ const {error}=await supabase.from('leave_requests').update({status:'cancelled'}).eq('id',id).eq('requested_by',userId).in('status',['pending','approved']);
  if(error){alert('ยกเลิกไม่สำเร็จ: '+error.message);return}
+ alert('ยกเลิกการลาเรียบร้อยแล้ว\\nระบบคืนวันลาในการคำนวณสิทธิ์ และบันทึกประวัติการยกเลิกไว้แล้ว');
  await renderLeaveList(userId);
 }
 async function renderLeaveList(userId:string){
@@ -310,7 +318,7 @@ async function renderLeaveList(userId:string){
  const map=new Map((people||[]).map((p:any)=>[p.id,p]));
  const typeLabels:any={personal:'ลากิจ',sick:'ลาป่วย',official:'ไปราชการ',outside_school:'ออกนอกโรงเรียน'};
  const statusLabels:any={pending:'รออนุมัติ',approved:'อนุมัติแล้ว',rejected:'ไม่อนุมัติ',cancelled:'ยกเลิก'};
- const rows=(data||[]).map((x:any)=>'<div class="table-row leave-row"><span>'+esc(x.request_no)+'</span><span>'+esc(typeLabels[x.leave_type])+'</span><span>'+esc(x.start_date+(x.end_date!==x.start_date?' ถึง '+x.end_date:''))+'</span><span>'+esc((x.counted_days||0)+' วันทำการ')+'</span><span>'+esc(map.get(x.requested_by)?.full_name||x.requested_by)+'</span><span>'+esc(statusLabels[x.status])+'</span><div class="leave-actions">'+(canApprove&&x.status==='pending'?'<button class="small" data-approve-leave="'+esc(x.id)+'">อนุมัติ</button><button class="secondary small" data-reject-leave="'+esc(x.id)+'">ไม่อนุมัติ</button>':'')+(!canApprove&&x.status==='pending'?'<button class="secondary small" data-cancel-leave="'+esc(x.id)+'">ยกเลิกคำขอ</button>':'')+'</div></div>').join('')||'<p class="muted">ยังไม่มีคำขอลา</p>';
+ const rows=(data||[]).map((x:any)=>'<div class="table-row leave-row"><span>'+esc(x.request_no)+'</span><span>'+esc(typeLabels[x.leave_type])+'</span><span>'+esc(x.start_date+(x.end_date!==x.start_date?' ถึง '+x.end_date:''))+'</span><span>'+esc((x.counted_days||0)+' วันทำการ')+'</span><span>'+esc(map.get(x.requested_by)?.full_name||x.requested_by)+'</span><span>'+esc(statusLabels[x.status])+'</span><div class="leave-actions">'+(canApprove&&x.status==='pending'?'<button class="small" data-approve-leave="'+esc(x.id)+'">อนุมัติ</button><button class="secondary small" data-reject-leave="'+esc(x.id)+'">ไม่อนุมัติ</button>':'')+(!canApprove&&(x.status==='pending'||x.status==='approved')&&x.start_date>today()?'<button class="secondary small" data-cancel-leave="'+esc(x.id)+'">'+(x.status==='approved'?'ยกเลิกการอนุมัติ/การลา':'ยกเลิกคำขอ')+'</button>':'')+'</div></div>').join('')||'<p class="muted">ยังไม่มีคำขอลา</p>';
  app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button data-leave-nav="dashboard">ภาพรวม</button><button class="active">ระบบการลา</button><button id="new-leave">＋ ยื่นคำขอลา</button>'+(canApprove?'<button id="manage-holidays">⚙ ปฏิทินวันหยุด</button>':'')+'<hr><button data-leave-nav="incoming">หนังสือรับ</button><button data-leave-nav="outgoing">หนังสือส่ง</button></aside><main class="page"><section class="welcome"><h1>ระบบการลา</h1><p class="muted">จัดการคำขอลาและการขออนุญาตของบุคลากร</p></section><section class="stats"><article><span>รายการทั้งหมด'+(canApprove?'':'ของฉัน')+'</span><strong>'+(data?.length||0)+'</strong></article><article><span>รออนุมัติ</span><strong>'+(data||[]).filter((x:any)=>x.status==='pending').length+'</strong></article><article><span>อนุมัติแล้ว</span><strong>'+(data||[]).filter((x:any)=>x.status==='approved').length+'</strong></article></section><section class="panel"><div class="table-head leave-head"><b>เลขที่</b><b>ประเภท</b><b>ช่วงวันที่</b><b>วันลา</b><b>ผู้ยื่น</b><b>สถานะ</b><b>การดำเนินการ</b></div>'+rows+'</section></main></div></div>';
  document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut());
  document.querySelector('#new-leave')!.addEventListener('click',()=>renderLeaveForm(userId));;if(canApprove)document.querySelector('#manage-holidays')!.addEventListener('click',()=>renderHolidayManager(userId))
