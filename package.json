@@ -12,7 +12,8 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.117.2",
     "vite": "^7.3.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "xlsx": "^0.20.3"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.62.0",
