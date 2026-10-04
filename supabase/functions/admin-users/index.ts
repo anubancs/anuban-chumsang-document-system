@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.2'
 import { corsHeaders } from 'npm:@supabase/supabase-js@2.117.2/cors'
 
 const PRODUCTION_URL = 'https://anuban-chumsang-document-system.60010106nkw1.workers.dev'
-const ALLOWED_ROLES = new Set(['admin', 'director', 'officer', 'staff'])
+const ALLOWED_ROLES = new Set(['admin', 'director', 'deputy_director', 'officer', 'staff'])
 
 function response(data: unknown, status = 200) {
   return Response.json(data, {
