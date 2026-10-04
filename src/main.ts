@@ -333,5 +333,46 @@ async function renderAuditLog(userId:string,filters:{search?:string,action?:stri
 async function renderDashboard(userId:string,view:View='dashboard'){const permissions=await getUserPermissions(userId);if(view==='users'&&!hasPermission(permissions,'users.manage'))view='dashboard';if(view==='audit'&&!hasPermission(permissions,'users.manage'))view='dashboard';if(view==='users'){await renderUsers(userId);return}if(view==='audit'){await renderAuditLog(userId);return}if(view==='leave'){await renderLeaveList(userId);return}if(view==='incoming'||view==='outgoing'){await renderDocumentList(view,userId);return}renderLoading('กำลังโหลดภาพรวม...');const [p,inc,out,tasks,roles,incCount,outCount,pendingApproval,taskCount,pendingLeaveCount]=await Promise.all([loadProfile(userId),supabase.from('incoming_documents').select('id,document_no,received_date,subject,status').order('received_date',{ascending:false}).limit(10),supabase.from('outgoing_documents').select('id,document_no,document_date,subject,status').order('document_date',{ascending:false}).limit(10),supabase.from('assignments').select('id,incoming_document_id,outgoing_document_id,due_date,status,note,incoming_documents(document_no,subject),outgoing_documents(document_no,subject)').eq('assigned_to',userId).neq('status','completed').order('due_date').limit(20),supabase.from('user_roles').select('roles(name)').eq('user_id',userId),supabase.from('incoming_documents').select('id',{count:'exact',head:true}),supabase.from('outgoing_documents').select('id',{count:'exact',head:true}),hasPermission(permissions,'documents.approve')?supabase.from('outgoing_documents').select('id',{count:'exact',head:true}).eq('status','pending_approval'):Promise.resolve({count:0}),supabase.from('assignments').select('id',{count:'exact',head:true}).eq('assigned_to',userId).neq('status','completed'),supabase.from('leave_requests').select('id',{count:'exact',head:true}).eq('requested_by',userId).eq('status','pending')]);const role=(roles.data?.[0] as any)?.roles?.name||'ผู้ใช้งาน';const canManageUsers=hasPermission(permissions,'users.manage');const canCreate=hasPermission(permissions,'documents.create');const canApprove=hasPermission(permissions,'documents.approve');let content='';if(view==='dashboard')content='<section class="welcome"><h1>สวัสดี '+esc(p?.full_name||'ผู้ใช้งาน')+'</h1><p class="muted">บทบาท: '+esc(role)+'</p></section><section class="stats"><article><span>หนังสือรับทั้งหมด</span><strong>'+(incCount.count||0)+'</strong></article><article><span>หนังสือส่งทั้งหมด</span><strong>'+(outCount.count||0)+'</strong></article><article><span>งานค้างของฉัน</span><strong>'+(taskCount.count||0)+'</strong></article><article><span>คำขอลารออนุมัติ</span><strong>'+(pendingLeaveCount.count||0)+'</strong></article>'+(canApprove?'<article><span>รออนุมัติ</span><strong>'+(pendingApproval.count||0)+'</strong></article>':'')+'</section><section class="grid"><article class="panel"><h2>หนังสือรับล่าสุด</h2>'+listRows(inc.data||[],'received_date','incoming')+'</article><article class="panel"><h2>หนังสือส่งล่าสุด</h2>'+listRows(out.data||[],'document_date','outgoing')+'</article></section>';if(view==='tasks')content='<section class="welcome"><h1>งานของฉัน</h1><p class="muted">งานที่ยังไม่เสร็จ · ทั้งหมด '+(taskCount.count||0)+' งาน</p></section><section class="panel">'+((tasks.data||[]).map((d:any)=>{const doc=d.incoming_documents||d.outgoing_documents;const kind=d.incoming_document_id?'incoming':'outgoing';return '<div class="row clickable" data-task-doc="'+esc(d.incoming_document_id||d.outgoing_document_id||'')+'" data-task-kind="'+kind+'"><b>'+esc(d.due_date||'-')+'</b><span>'+esc(doc?.document_no||'')+' — '+esc(doc?.subject||d.note||'งานเอกสาร')+'</span><small>'+esc(d.status)+'</small></div>'}).join('')||'<p class="muted">ไม่มีงานค้าง</p>')+'</section>';app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button data-view="dashboard">ภาพรวม</button><button data-view="incoming">หนังสือรับ</button><button data-view="outgoing">หนังสือส่ง</button><button data-view="tasks">งานของฉัน</button><button data-view="leave">ระบบการลา</button>'+(canManageUsers?'<button data-view="users">ผู้ใช้งาน</button><button data-view="audit">ประวัติการใช้งาน</button>':'')+'<hr>'+(canCreate?'<button id="new-in">＋ ลงทะเบียนหนังสือรับ</button><button id="new-out">＋ ลงทะเบียนหนังสือส่ง</button>':'')+'</aside><main class="page">'+content+'</main></div></div>';document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut());document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(b=>b.onclick=()=>renderDashboard(userId,b.dataset.view as View));document.querySelector('#new-in')?.addEventListener('click',()=>documentForm('incoming',userId));document.querySelector('#new-out')?.addEventListener('click',()=>documentForm('outgoing',userId));document.querySelectorAll<HTMLElement>('[data-doc-id]').forEach(el=>el.addEventListener('click',()=>showDocument(el.dataset.docKind as 'incoming'|'outgoing',el.dataset.docId!,userId)));document.querySelectorAll<HTMLElement>('[data-task-doc]').forEach(el=>el.addEventListener('click',()=>showDocument(el.dataset.taskKind as 'incoming'|'outgoing',el.dataset.taskDoc!,userId)))}
 
 
-async function boot(){let invitePending=isInviteSession();let recoveryPending=isRecoverySession();supabase.auth.onAuthStateChange(async(event,s)=>{if(event==='PASSWORD_RECOVERY'||isRecoverySession()){recoveryPending=true;renderPasswordRecovery();return}if(s?.user){if(recoveryPending||isRecoverySession()){recoveryPending=true;renderPasswordRecovery();return}if(invitePending||isInviteSession()||s.user.user_metadata?.must_change_password===true){invitePending=false;renderSetInitialPassword();return}await renderDashboard(s.user.id)}else{invitePending=false;if(!recoveryPending)renderLogin()}});const {data:{session}}=await supabase.auth.getSession();if(recoveryPending||isRecoverySession()){recoveryPending=true;renderPasswordRecovery()}else if(session?.user){if(invitePending||isInviteSession()||session.user.user_metadata?.must_change_password===true)renderSetInitialPassword();else await renderDashboard(session.user.id)}else renderLogin()}
+async function boot(){
+ let invitePending=isInviteSession();
+ let recoveryPending=isRecoverySession();
+ const handleSession=async(s:any,allowSignedIn:boolean)=>{
+   if(!s?.user){renderLogin();return}
+   if(recoveryPending||isRecoverySession()){recoveryPending=true;renderPasswordRecovery();return}
+   if(invitePending||isInviteSession()||s.user.user_metadata?.must_change_password===true){invitePending=false;renderSetInitialPassword();return}
+   if(allowSignedIn) await renderDashboard(s.user.id)
+ };
+ supabase.auth.onAuthStateChange(async(event,s)=>{
+   // IMPORTANT: Do not rebuild the application on token refresh/user updates.
+   // Those events can occur while the user is working in a form (including
+   // when the browser tab becomes active again). Re-rendering would erase
+   // unsaved form data.
+   if(event==='PASSWORD_RECOVERY'){
+     recoveryPending=true;
+     renderPasswordRecovery();
+     return;
+   }
+   if(event==='SIGNED_OUT'){
+     invitePending=false;
+     recoveryPending=false;
+     renderLogin();
+     return;
+   }
+   if(event==='SIGNED_IN'){
+     await handleSession(s,true);
+     return;
+   }
+   // INITIAL_SESSION, TOKEN_REFRESHED and USER_UPDATED intentionally do nothing.
+ });
+ const {data:{session}}=await supabase.auth.getSession();
+ if(recoveryPending||isRecoverySession()){
+   recoveryPending=true;
+   renderPasswordRecovery();
+ }else if(session?.user){
+   await handleSession(session,false);
+ }else{
+   renderLogin();
+ }
+}
+
 boot()
