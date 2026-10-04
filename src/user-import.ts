@@ -60,7 +60,7 @@ function validate(rows:ImportRow[]){
  })
  return errors
 }
-function template(){
+export function downloadUserImportTemplate(){
  const rows=[
   ['email','full_name','role_code','position','leave_policy','password'],
   ['teacher@example.com','ตัวอย่าง ครู','staff','ครู','teacher_civil_servant',''],
@@ -75,7 +75,7 @@ export async function renderUserImport(userId:string,onDone:()=>void){
  app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><main class="page"><button id="back-users" class="link-btn">← กลับผู้ใช้งาน</button><section class="welcome"><h1>นำเข้าผู้ใช้งานจาก Excel</h1><p class="muted">ระบบจะสร้างบัญชี Auth โดยไม่ส่งอีเมล และสร้าง/ใช้รหัสผ่านชั่วคราวให้แต่ละคน</p></section><section class="panel form-panel"><div class="actions"><button id="download-template" class="secondary">ดาวน์โหลดแบบฟอร์ม Excel</button></div><p class="muted">คอลัมน์: email, full_name, role_code, position, leave_policy, password (password เว้นว่างได้ ระบบจะสร้างให้)</p><input id="user-import-file" type="file" accept=".xlsx,.xls" /><p id="user-import-message" class="muted"></p><div id="user-import-preview"></div><div class="actions"><button id="import-users-submit" disabled>นำเข้าผู้ใช้งาน</button></div></section></main></div>'
  document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
  document.querySelector('#back-users')!.addEventListener('click',onDone)
- document.querySelector('#download-template')!.addEventListener('click',template)
+ document.querySelector('#download-template')!.addEventListener('click',downloadUserImportTemplate)
  let rows:ImportRow[]=[]
  document.querySelector<HTMLInputElement>('#user-import-file')!.addEventListener('change',async e=>{
   const file=(e.target as HTMLInputElement).files?.[0]; if(!file)return
