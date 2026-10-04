@@ -111,7 +111,7 @@ export async function renderUserImport(userId:string,onDone:()=>void){
    XLSX.writeFile(wb,'imported-user-temporary-passwords.xlsx')
   }
   const msg='สร้างผู้ใช้งานสำเร็จ '+created.length+' รายการ'+(failed.length?' · ไม่สำเร็จ '+failed.length+' รายการ':'')+' · ดาวน์โหลดไฟล์รหัสผ่านชั่วคราวแล้ว'
-  alert(msg+'\n\nผู้ใช้ทุกคนต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก')
+  alert(msg+(failed.length?'\n\nรายละเอียดรายการที่ไม่สำเร็จ:\n'+failed.slice(0,20).map(x=>'แถว '+x.row+' ('+x.email+'): '+x.error).join('\n')+(failed.length>20?'\nและอีก '+(failed.length-20)+' รายการ':''):'')+'\n\nผู้ใช้ทุกคนต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก')
   await onDone()
  })
 }
