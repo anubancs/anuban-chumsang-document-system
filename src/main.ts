@@ -118,7 +118,8 @@ async function deleteDocument(kind:'incoming'|'outgoing',id:string){
   const {data:{session}}=await supabase.auth.getSession()
   if(!session){alert('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');return false}
   const response=await fetch(deleteFunctionUrl,{method:'POST',headers:{Authorization:'Bearer '+session.access_token,apikey:import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY||'','Content-Type':'application/json'},body:JSON.stringify({document_type:kind,document_id:id})})
-  const result=await response.json().catch(()=>({}))  if(!response.ok||!result.ok){alert(result.error||result.message||'ลบเอกสารไม่สำเร็จ');return false}
+  const result=await response.json().catch(()=>({}))
+  if(!response.ok||!result.ok){alert(result.error||result.message||'ลบเอกสารไม่สำเร็จ');return false}
   return true
 }
 
