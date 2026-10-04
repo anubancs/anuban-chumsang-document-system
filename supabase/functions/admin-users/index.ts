@@ -73,7 +73,7 @@ async function listUsers(admin: any) {
 
   const ids = users.map((u: any) => u.id)
   const [{ data: profiles, error: profileError }, { data: assignments, error: roleError }] = await Promise.all([
-    admin.from('profiles').select('id,full_name,email,leave_policy').in('id', ids),
+    admin.from('profiles').select('id,full_name,email,position,leave_policy').in('id', ids),
     admin.from('user_roles').select('user_id,roles!inner(code,name)').in('user_id', ids),
   ])
 
@@ -98,6 +98,7 @@ async function listUsers(admin: any) {
       confirmed: Boolean(u.email_confirmed_at),
       last_sign_in_at: u.last_sign_in_at,
       created_at: u.created_at,
+      position: profileMap.get(u.id)?.position ?? '',
       leave_policy: profileMap.get(u.id)?.leave_policy ?? 'other',
       roles: roleMap.get(u.id) ?? [],
     })),
@@ -122,7 +123,7 @@ async function inviteUser(admin: any, actorId: string, body: any) {
   if (roleError || !role) return response({ error: 'ไม่พบบทบาทที่เลือก' }, 500)
 
   const { error: profileError } = await admin.from('profiles')
-    .upsert({ id: data.user.id, full_name: fullName, email, leave_policy: 'other' }, { onConflict: 'id' })
+    .upsert({ id: data.user.id, full_name: fullName, email, position: String(body.position ?? '').trim(), leave_policy: 'other' }, { onConflict: 'id' })
   if (profileError) return response({ error: 'สร้างโปรไฟล์ไม่สำเร็จ: ' + profileError.message }, 500)
 
   const { error: assignmentError } = await admin.from('user_roles')
@@ -150,7 +151,7 @@ async function updateUser(admin: any, actorId: string, body: any) {
     if ((count ?? 0) <= 1) return response({ error: 'ไม่สามารถลดบทบาทผู้ดูแลระบบคนสุดท้ายได้' }, 400)
   }
 
-  const { error: profileError } = await admin.from('profiles').update({ full_name: fullName }).eq('id', targetId)
+  const { error: profileError } = await admin.from('profiles').update({ full_name: fullName, position: String(body.position ?? '').trim() }).eq('id', targetId)
   if (profileError) return response({ error: 'แก้ไขโปรไฟล์ไม่สำเร็จ: ' + profileError.message }, 500)
 
   const { error: metadataError } = await admin.auth.admin.updateUserById(targetId, { user_metadata: { full_name: fullName } })
@@ -162,6 +163,81 @@ async function updateUser(admin: any, actorId: string, body: any) {
   if (assignmentError) return response({ error: 'เปลี่ยนบทบาทไม่สำเร็จ: ' + assignmentError.message }, 500)
 
   return response({ ok: true })
+}
+
+function generateTemporaryPassword(){
+  const chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  const bytes=new Uint32Array(12);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes,b=>chars[b%chars.length]).join('');
+}
+
+async function importUsers(admin: any, actorId: string, body: any) {
+  const rows=Array.isArray(body.users)?body.users:[];
+  if(!rows.length) return response({error:'ไม่มีข้อมูลผู้ใช้งานสำหรับนำเข้า'},400);
+  if(rows.length>200) return response({error:'นำเข้าได้ครั้งละไม่เกิน 200 รายการ'},400);
+
+  const {data:roles,error:rolesError}=await admin.from('roles')
+    .select('id,code').in('code',Array.from(ALLOWED_ROLES));
+  if(rolesError) return response({error:'โหลดบทบาทไม่สำเร็จ: '+rolesError.message},500);
+  const roleMap=new Map((roles??[]).map((r:any)=>[r.code,r.id]));
+  const allowedPolicies=new Set(['teacher_civil_servant','government_employee','other']);
+  const created:any[]=[];
+  const failed:any[]=[];
+  const seen=new Set<string>();
+
+  for(let i=0;i<rows.length;i++){
+    const row=rows[i]??{};
+    const email=String(row.email??'').trim().toLowerCase();
+    const fullName=String(row.full_name??'').trim();
+    const roleCode=String(row.role_code??'staff').trim();
+    const position=String(row.position??'').trim();
+    const leavePolicy=String(row.leave_policy??'other').trim()||'other';
+    const password=String(row.password??'').trim()||generateTemporaryPassword();
+    const rowNo=i+2;
+
+    if(!/^\\S+@\\S+\\.\\S+$/.test(email)){failed.push({row:rowNo,email,error:'อีเมลไม่ถูกต้อง'});continue}
+    if(!fullName){failed.push({row:rowNo,email,error:'ไม่มีชื่อผู้ใช้งาน'});continue}
+    if(!ALLOWED_ROLES.has(roleCode)||!roleMap.get(roleCode)){failed.push({row:rowNo,email,error:'บทบาทไม่ถูกต้อง'});continue}
+    if(!allowedPolicies.has(leavePolicy)){failed.push({row:rowNo,email,error:'สิทธิการลาไม่ถูกต้อง'});continue}
+    if(password.length<6){failed.push({row:rowNo,email,error:'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'});continue}
+    if(seen.has(email)){failed.push({row:rowNo,email,error:'อีเมลซ้ำในไฟล์'});continue}
+    seen.add(email);
+
+    const {data,error:createError}=await admin.auth.admin.createUser({
+      email,password,email_confirm:true,
+      user_metadata:{full_name:fullName,position,must_change_password:true}
+    });
+    if(createError||!data.user){
+      failed.push({row:rowNo,email,error:createError?.message??'สร้างบัญชี Auth ไม่สำเร็จ'});
+      continue;
+    }
+    const userId=data.user.id;
+    const {error:profileError}=await admin.from('profiles').upsert({
+      id:userId,full_name:fullName,email,position,leave_policy:leavePolicy
+    },{onConflict:'id'});
+    if(profileError){
+      await admin.auth.admin.deleteUser(userId);
+      failed.push({row:rowNo,email,error:'สร้างโปรไฟล์ไม่สำเร็จ: '+profileError.message});
+      continue;
+    }
+    const {error:roleError}=await admin.from('user_roles').upsert({
+      user_id:userId,role_id:roleMap.get(roleCode),assigned_by:actorId
+    },{onConflict:'user_id,role_id'});
+    if(roleError){
+      await admin.auth.admin.deleteUser(userId);
+      failed.push({row:rowNo,email,error:'กำหนดบทบาทไม่สำเร็จ: '+roleError.message});
+      continue;
+    }
+    const {error:auditError}=await admin.from('audit_logs').insert({
+      actor_id:actorId,action:'insert',entity_type:'auth_users',entity_id:userId,
+      old_data:null,new_data:{action:'bulk_import',email,full_name:fullName,role_code:roleCode}
+    });
+    if(auditError) console.error('bulk import audit log failed',auditError.message);
+    created.push({row:rowNo,user_id:userId,email,full_name:fullName,password});
+  }
+
+  return response({ok:true,created,failed});
 }
 
 async function setLeavePolicy(admin: any, actorId: string, body: any) {
@@ -249,6 +325,7 @@ export default {
       if (body.action === 'update') return updateUser(auth.admin, auth.userId, body)
       if (body.action === 'reset_password') return resetPassword(auth.admin, auth.userId, body)
       if (body.action === 'set_leave_policy') return setLeavePolicy(auth.admin, auth.userId, body)
+      if (body.action === 'import_users') return importUsers(auth.admin, auth.userId, body)
       if (body.action === 'delete') return deleteUser(auth.admin, auth.userId, body)
       return response({ error: 'ไม่รู้จักคำสั่ง' }, 400)
     } catch (error) {
