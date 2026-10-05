@@ -15,7 +15,7 @@ const PAGE_SIZE=50
 const UI_STATE_KEY='anuban_ui_state_v2'
 const DRAFT_PREFIX='anuban_form_draft_v2:'
 let uiRenderVersion=0
-function saveUiState(screen:string,meta:any={}){try{sessionStorage.setItem(UI_STATE_KEY,JSON.stringify({screen,meta,at:Date.now()}))}catch{}}
+function saveUiState(screen:string,meta:any={}){const version=++uiRenderVersion;try{sessionStorage.setItem(UI_STATE_KEY,JSON.stringify({screen,meta,at:Date.now()}))}catch{}return version}
 function readUiState():any{try{return JSON.parse(sessionStorage.getItem(UI_STATE_KEY)||'null')}catch{return null}}
 function clearUiState(){try{sessionStorage.removeItem(UI_STATE_KEY)}catch{}}
 function saveFormDraft(form:HTMLFormElement){if(!form.id||form.id==='login-form'||form.id==='initial-password-form'||form.id==='recovery-form')return;const data:any={};form.querySelectorAll<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>('[name]').forEach(el=>{if(el instanceof HTMLInputElement&&(el.type==='password'||el.type==='file'))return;if(el instanceof HTMLInputElement&&el.type==='checkbox')data[el.name]=el.checked;else if(el instanceof HTMLSelectElement&&el.multiple)data[el.name]=Array.from(el.selectedOptions).map(o=>o.value);else data[el.name]=el.value});try{sessionStorage.setItem(DRAFT_PREFIX+form.id,JSON.stringify({data,at:Date.now()}))}catch{}}
