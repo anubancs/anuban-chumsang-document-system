@@ -20,6 +20,72 @@ function readUiState():any{try{return JSON.parse(sessionStorage.getItem(UI_STATE
 function clearUiState(){try{sessionStorage.removeItem(UI_STATE_KEY)}catch{}}
 function saveFormDraft(form:HTMLFormElement){if(!form.id||form.id==='login-form'||form.id==='initial-password-form'||form.id==='recovery-form')return;const data:any={};form.querySelectorAll<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>('[name]').forEach(el=>{if(el instanceof HTMLInputElement&&(el.type==='password'||el.type==='file'))return;if(el instanceof HTMLInputElement&&el.type==='checkbox')data[el.name]=el.checked;else if(el instanceof HTMLSelectElement&&el.multiple)data[el.name]=Array.from(el.selectedOptions).map(o=>o.value);else data[el.name]=el.value});try{sessionStorage.setItem(DRAFT_PREFIX+form.id,JSON.stringify({data,at:Date.now()}))}catch{}}
 function clearFormDraft(form:HTMLFormElement){try{sessionStorage.removeItem(DRAFT_PREFIX+form.id)}catch{}}
+
+type NotificationRow={id:string;recipient_id:string;actor_id?:string|null;type:string;title:string;message:string;entity_type?:string|null;entity_id?:string|null;read_at?:string|null;created_at:string}
+let notificationChannel:any=null
+let notificationUserId:string|null=null
+let notificationRows:NotificationRow[]=[]
+let notificationObserver:MutationObserver|undefined
+function notificationTime(v:string){try{return new Intl.DateTimeFormat('th-TH',{dateStyle:'short',timeStyle:'short'}).format(new Date(v))}catch{return v}}
+function renderNotificationWidget(){
+ const topbar=document.querySelector<HTMLElement>('.topbar')
+ if(!topbar||topbar.querySelector('#notification-widget'))return
+ const logout=document.querySelector('#logout')
+ const html='<div id="notification-widget" class="notification-widget"><button id="notification-bell" class="notification-bell secondary" aria-label="การแจ้งเตือน">🔔<span id="notification-badge" class="notification-badge"></span></button><div id="notification-panel" class="notification-panel" hidden><div class="notification-head"><strong>การแจ้งเตือน</strong><button id="notification-read-all" class="secondary small">อ่านทั้งหมด</button></div><div id="notification-list"></div></div></div>'
+ if(logout)logout.insertAdjacentHTML('beforebegin',html);else topbar.insertAdjacentHTML('beforeend',html)
+ document.querySelector('#notification-bell')?.addEventListener('click',()=>{
+   const p=document.querySelector<HTMLElement>('#notification-panel');if(p)p.hidden=!p.hidden
+ })
+ document.querySelector('#notification-read-all')?.addEventListener('click',async()=>{
+   if(!notificationUserId)return
+   await supabase.from('notifications').update({read_at:new Date().toISOString()}).eq('recipient_id',notificationUserId).is('read_at',null)
+   await refreshNotifications()
+ })
+ document.querySelector('#notification-list')?.addEventListener('click',async e=>{
+   const item=(e.target as HTMLElement).closest<HTMLElement>('[data-notification-id]');if(!item)return
+   const row=notificationRows.find(x=>x.id===item.dataset.notificationId);if(!row)return
+   if(!row.read_at){await supabase.from('notifications').update({read_at:new Date().toISOString()}).eq('id',row.id);row.read_at=new Date().toISOString()}
+   const p=document.querySelector<HTMLElement>('#notification-panel');if(p)p.hidden=true
+   if(row.entity_type==='incoming_documents'||row.entity_type==='outgoing_documents')showDocument(row.entity_type==='incoming_documents'?'incoming':'outgoing',row.entity_id!,notificationUserId!)
+   else if(row.entity_type==='leave_requests')renderLeaveList(notificationUserId!)
+   else if(row.entity_type==='assignments')renderDashboard(notificationUserId!,'tasks')
+   renderNotificationWidget();renderNotificationList()
+ })
+}
+function renderNotificationList(){
+ renderNotificationWidget()
+ const list=document.querySelector<HTMLElement>('#notification-list');const badge=document.querySelector<HTMLElement>('#notification-badge');if(!list||!badge)return
+ const unread=notificationRows.filter(x=>!x.read_at).length
+ badge.textContent=unread>99?'99+':String(unread);badge.style.display=unread?'inline-flex':'none'
+ list.innerHTML=notificationRows.length?notificationRows.map(x=>'<button class="notification-item '+(x.read_at?'':'unread')+'" data-notification-id="'+esc(x.id)+'"><strong>'+esc(x.title)+'</strong><span>'+esc(x.message)+'</span><small>'+esc(notificationTime(x.created_at))+'</small></button>').join(''):'<p class="muted notification-empty">ยังไม่มีการแจ้งเตือน</p>'
+}
+async function refreshNotifications(){
+ if(!notificationUserId)return
+ const {data,error}=await supabase.from('notifications').select('id,recipient_id,actor_id,type,title,message,entity_type,entity_id,read_at,created_at').eq('recipient_id',notificationUserId).order('created_at',{ascending:false}).limit(30)
+ if(!error){notificationRows=(data||[]) as NotificationRow[];renderNotificationList()}
+}
+async function setupNotifications(userId:string){
+ if(notificationUserId===userId&&notificationChannel)return
+ if(notificationChannel){await supabase.removeChannel(notificationChannel);notificationChannel=null}
+ notificationUserId=userId
+ await refreshNotifications()
+ notificationChannel=supabase.channel('notifications-'+userId).on('postgres_changes',{event:'INSERT',schema:'public',table:'notifications',filter:'recipient_id=eq.'+userId},payload=>{
+   const row=payload.new as NotificationRow
+   notificationRows=[row,...notificationRows.filter(x=>x.id!==row.id)].slice(0,30)
+   renderNotificationList()
+   const p=document.querySelector<HTMLElement>('#notification-panel');if(p)p.hidden=false
+ }).subscribe()
+ if(!notificationObserver){
+   notificationObserver=new MutationObserver(()=>{renderNotificationWidget();renderNotificationList()})
+   notificationObserver.observe(app,{childList:true,subtree:true})
+ }
+ renderNotificationWidget();renderNotificationList()
+}
+async function teardownNotifications(){
+ if(notificationChannel){await supabase.removeChannel(notificationChannel);notificationChannel=null}
+ notificationUserId=null;notificationRows=[]
+ if(notificationObserver){notificationObserver.disconnect();notificationObserver=undefined}
+}
 function restoreFormDraft(form:HTMLFormElement){try{const saved=JSON.parse(sessionStorage.getItem(DRAFT_PREFIX+form.id)||'null');if(!saved)return;const data=saved.data||{};form.querySelectorAll<HTMLInputElement|HTMLTextAreaElement|HTMLSelectElement>('[name]').forEach(el=>{if(!(el.name in data)||(el instanceof HTMLInputElement&&el.type==='password'))return;if(el instanceof HTMLInputElement&&el.type==='checkbox')el.checked=Boolean(data[el.name]);else if(el instanceof HTMLSelectElement&&el.multiple){const v=new Set(Array.isArray(data[el.name])?data[el.name]:[]);Array.from(el.options).forEach(o=>o.selected=v.has(o.value))}else el.value=String(data[el.name]??'')})}catch{}}
 let draftTimer:number|undefined
 function installDraftProtection(){app.addEventListener('input',e=>{const f=(e.target as HTMLElement)?.closest?.('form') as HTMLFormElement|null;if(f){window.clearTimeout(draftTimer);draftTimer=window.setTimeout(()=>saveFormDraft(f),200)}});app.addEventListener('change',e=>{const f=(e.target as HTMLElement)?.closest?.('form') as HTMLFormElement|null;if(f)saveFormDraft(f)});const observer=new MutationObserver(()=>app.querySelectorAll<HTMLFormElement>('form[id]').forEach(f=>{if(!f.dataset.draftBound){f.dataset.draftBound='1';restoreFormDraft(f)}}));observer.observe(app,{childList:true,subtree:true})}
@@ -362,7 +428,7 @@ async function boot(){
    activeUserId=s.user.id
    if(recoveryPending||isRecoverySession()){recoveryPending=true;renderPasswordRecovery();return}
    if(invitePending||isInviteSession()||s.user.user_metadata?.must_change_password===true){invitePending=false;renderSetInitialPassword();return}
-   if(allowSignedIn) await renderDashboard(s.user.id)
+   if(allowSignedIn){await setupNotifications(s.user.id);await renderDashboard(s.user.id)}
  };
  supabase.auth.onAuthStateChange(async(event,s)=>{
    // IMPORTANT: Do not rebuild the application on token refresh/user updates.
@@ -375,6 +441,7 @@ async function boot(){
      return;
    }
    if(event==='SIGNED_OUT'){
+     await teardownNotifications();
      invitePending=false;
      recoveryPending=false;
      renderLogin();
@@ -390,7 +457,7 @@ async function boot(){
    // INITIAL_SESSION, TOKEN_REFRESHED and USER_UPDATED intentionally do nothing.
  });
  const {data:{session}}=await supabase.auth.getSession();
- if(session?.user) activeUserId=session.user.id;
+ if(session?.user){activeUserId=session.user.id;await setupNotifications(session.user.id)}
  appBooted=true;
  if(recoveryPending||isRecoverySession()){
    recoveryPending=true;
