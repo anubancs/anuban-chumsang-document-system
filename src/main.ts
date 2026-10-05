@@ -277,6 +277,7 @@ async function saveLeaveRequest(userId:string){
  const {error}=await supabase.from('leave_requests').insert(payload);
  if(error){m.textContent='ยื่นคำขอไม่สำเร็จ: '+error.message;m.className='error';return}
  m.textContent='ยื่นคำขอเรียบร้อยแล้ว · นับวันลา '+preview.days+' วันทำการ';m.className='success';
+ const form=document.querySelector<HTMLFormElement>('#leave-form');if(form)clearFormDraft(form);
  setTimeout(()=>renderLeaveList(userId),900);
 }
 async function renderLeaveForm(userId:string){const renderVersion=saveUiState('leaveForm');
