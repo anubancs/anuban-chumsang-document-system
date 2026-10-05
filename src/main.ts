@@ -76,7 +76,7 @@ async function setupNotifications(userId:string){
    const p=document.querySelector<HTMLElement>('#notification-panel');if(p)p.hidden=false
  }).subscribe()
  if(!notificationObserver){
-   notificationObserver=new MutationObserver(()=>{renderNotificationWidget();renderNotificationList()})
+   notificationObserver=new MutationObserver(()=>{if(!app.querySelector('#notification-widget')){renderNotificationWidget();renderNotificationList()}})
    notificationObserver.observe(app,{childList:true,subtree:true})
  }
  renderNotificationWidget();renderNotificationList()
