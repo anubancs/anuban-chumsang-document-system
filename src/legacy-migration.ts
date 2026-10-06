@@ -39,14 +39,13 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
  if(error){alert('โหลดรายชื่อบุคลากรไม่สำเร็จ: '+error.message);return}
  const current=(profiles||[]).map((x:any)=>({...x,role_code:x.user_roles?.[0]?.roles?.code||null})) as CurrentUser[]
  const app=document.querySelector<HTMLDivElement>('#app')!
- app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button id="back-migration">← กลับภาพรวม</button><button class="active">นำเข้าข้อมูลสารบรรณเดิม</button></aside><main class="page"><section class="welcome"><h1>นำเข้าข้อมูลสารบรรณจากระบบเดิม</h1><p class="muted">เลือกเฉพาะบุคลากรที่ยังมีบัญชีอยู่ในระบบใหม่ · ข้อมูลวันลาและโมดูลอื่นจะไม่ถูกนำเข้า</p></section><section class="panel" id="legacy-existing-batches">
+ app.innerHTML=`<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button id="back-migration">← กลับภาพรวม</button><button class="active">นำเข้าข้อมูลสารบรรณเดิม</button></aside><main class="page"><section class="welcome"><h1>นำเข้าข้อมูลสารบรรณจากระบบเดิม</h1><p class="muted">เลือกเฉพาะบุคลากรที่ยังมีบัญชีอยู่ในระบบใหม่ · ข้อมูลวันลาและโมดูลอื่นจะไม่ถูกนำเข้า</p></section><section class="panel" id="legacy-existing-batches">
 <h2>1. ชุดข้อมูลที่เตรียมไว้แล้ว</h2>
 <p class="muted">เลือก Batch ที่พักข้อมูลไว้แล้วเพื่อตรวจสอบก่อนนำเข้าจริง · ไม่ต้องอัปโหลดไฟล์ซ้ำ</p>
 <div id="legacy-batch-list"><p class="muted">กำลังโหลดชุดข้อมูล...</p></div>
 <div id="legacy-batch-result" style="margin-top:16px"></div>
 </section>
-<section class="panel"><h2>2. นำเข้าไฟล์ระบบเดิมชุดใหม่</h2><p class="muted">รองรับ Excel .xlsx/.xls · ระบบจะตรวจสอบและพักข้อมูลไว้ก่อน ยังไม่เขียนลงหนังสือรับ/ส่งจริง</p><input id="legacy-file" type="file" accept=".xlsx,.xls"><p id="legacy-file-message" class="muted"></p></section><section id="legacy-selection" class="panel" hidden></section></main></div></div>'
- document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
+<section class="panel"><h2>2. นำเข้าไฟล์ระบบเดิมชุดใหม่</h2><p class="muted">รองรับ Excel .xlsx/.xls · ระบบจะตรวจสอบและพักข้อมูลไว้ก่อน ยังไม่เขียนลงหนังสือรับ/ส่งจริง</p><input id="legacy-file" type="file" accept=".xlsx,.xls"><p id="legacy-file-message" class="muted"></p></section><section id="legacy-selection" class="panel" hidden></section></main></div></div>`('click',()=>supabase.auth.signOut())
  document.querySelector('#back-migration')!.addEventListener('click',onBack)
 
  const renderExistingBatches=async()=>{
