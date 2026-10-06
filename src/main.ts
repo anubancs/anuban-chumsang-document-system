@@ -11,6 +11,26 @@ const today=()=>new Date().toISOString().slice(0,10)
 const functionUrl='https://uwebbofczidcfnjbvsqu.supabase.co/functions/v1/drive-file'
 const deleteFunctionUrl='https://uwebbofczidcfnjbvsqu.supabase.co/functions/v1/delete-document'
 const productionUrl='https://anuban-chumsang-document-system.60010106nkw1.workers.dev'
+const VAPID_PUBLIC_KEY='BKwSwfhFwSN5MVEy8woiv3kZ6UQ3ZlvlGdIDsXL2cpTexnPQjn6VLUae2jbHRWK7GwJ40xkn_ne-VlUJvZNwjMU'
+function urlBase64ToUint8Array(base64String:string){const padding='='.repeat((4-base64String.length%4)%4);const raw=atob((base64String+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)))}
+async function enableMobileNotifications(userId:string){
+ if(!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window)){alert('เบราว์เซอร์นี้ยังไม่รองรับการแจ้งเตือนบนมือถือ');return false}
+ const permission=await Notification.requestPermission(); if(permission!=='granted'){alert('ยังไม่ได้อนุญาตการแจ้งเตือน กรุณาอนุญาตจากการตั้งค่าเบราว์เซอร์');return false}
+ const reg=await navigator.serviceWorker.register('/sw.js')
+ const existing=await reg.pushManager.getSubscription()
+ const sub=existing||await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)})
+ const json=sub.toJSON()
+ if(!json.endpoint||!json.keys?.p256dh||!json.keys?.auth){alert('ไม่สามารถบันทึกการแจ้งเตือนได้');return false}
+ const {error}=await supabase.from('push_subscriptions').upsert({user_id:userId,endpoint:json.endpoint,p256dh:json.keys.p256dh,auth:json.keys.auth,user_agent:navigator.userAgent,updated_at:new Date().toISOString()},{onConflict:'user_id,endpoint'})
+ if(error){alert('เปิดแจ้งเตือนไม่สำเร็จ: '+error.message);return false}
+ alert('เปิดการแจ้งเตือนบนอุปกรณ์นี้แล้ว')
+ return true
+}
+async function showLocalNotification(row:NotificationRow){
+ if(!('Notification' in window)||Notification.permission!=='granted')return
+ try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.showNotification(row.title,{body:row.message,icon:'/school-logo.jpg',badge:'/school-logo.jpg',tag:'anuban-'+row.type,data:{url:'/'}});else new Notification(row.title,{body:row.message,icon:'/school-logo.jpg'})}catch{}
+}
+
 const authRedirectUrl=window.location.hostname==='localhost'||window.location.hostname==='127.0.0.1'?window.location.origin:productionUrl
 const PAGE_SIZE=50
 const UI_STATE_KEY='anuban_ui_state_v2'
@@ -34,11 +54,12 @@ function renderNotificationWidget(){
  const topbar=document.querySelector<HTMLElement>('.topbar')
  if(!topbar||topbar.querySelector('#notification-widget'))return
  const logout=document.querySelector('#logout')
- const html='<div id="notification-widget" class="notification-widget"><button id="notification-bell" class="notification-bell secondary" aria-label="การแจ้งเตือน">🔔<span id="notification-badge" class="notification-badge"></span></button><div id="notification-panel" class="notification-panel" hidden><div class="notification-head"><strong>การแจ้งเตือน</strong><button id="notification-read-all" class="secondary small">อ่านทั้งหมด</button></div><div id="notification-list"></div></div></div>'
+ const html='<div id="notification-widget" class="notification-widget"><button id="notification-bell" class="notification-bell secondary" aria-label="การแจ้งเตือน">🔔<span id="notification-badge" class="notification-badge"></span></button><div id="notification-panel" class="notification-panel" hidden><div class="notification-head"><strong>การแจ้งเตือน</strong><div><button id="enable-mobile-notifications" class="secondary small">📱 เปิดแจ้งเตือนมือถือ</button> <button id="notification-read-all" class="secondary small">อ่านทั้งหมด</button></div></div><div id="notification-list"></div></div></div>'
  if(logout)logout.insertAdjacentHTML('beforebegin',html);else topbar.insertAdjacentHTML('beforeend',html)
  document.querySelector('#notification-bell')?.addEventListener('click',()=>{
    const p=document.querySelector<HTMLElement>('#notification-panel');if(p)p.hidden=!p.hidden
  })
+ document.querySelector('#enable-mobile-notifications')?.addEventListener('click',()=>{if(notificationUserId)enableMobileNotifications(notificationUserId)})
  document.querySelector('#notification-read-all')?.addEventListener('click',async()=>{
    if(!notificationUserId)return
    await supabase.from('notifications').update({read_at:new Date().toISOString()}).eq('recipient_id',notificationUserId).is('read_at',null)
@@ -76,6 +97,7 @@ async function setupNotifications(userId:string){
    const row=payload.new as NotificationRow
    notificationRows=[row,...notificationRows.filter(x=>x.id!==row.id)].slice(0,30)
    renderNotificationList()
+   void showLocalNotification(row)
    const p=document.querySelector<HTMLElement>('#notification-panel');if(p)p.hidden=false
  }).subscribe()
  if(!notificationObserver){
