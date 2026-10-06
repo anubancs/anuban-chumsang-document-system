@@ -3,6 +3,7 @@ import { supabase } from './lib/supabase'
 
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] as string))
 const norm=(v:unknown)=>String(v??'').trim().replace(/\s+/g,' ').toLowerCase()
+const personNorm=(v:unknown)=>norm(v).replace(/^(ผอ\.|นางสาว|นาง|นาย)\s*/,'').replace(/^รอง\s*[ฯ.]\s*/,'').replace(/\s+/g,'')
 type CurrentUser={id:string;full_name:string|null;email:string|null;position:string|null}
 type LegacyUser={UserID:string;Username:string;FullName:string}
 
@@ -26,27 +27,30 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
    const data=await parseWorkbook(file)
    const legacyUsers=(data.Users||[]).map((x:any)=>({UserID:String(x.UserID||'').trim(),Username:String(x.Username||'').trim(),FullName:String(x.FullName||'').trim()})).filter((x:LegacyUser)=>x.UserID)
    const nameGroups=new Map<string,CurrentUser[]>()
-   current.forEach(x=>{const k=norm(x.full_name);if(!k)return;nameGroups.set(k,[...(nameGroups.get(k)||[]),x])})
+   current.forEach(x=>{const k=personNorm(x.full_name);if(!k)return;nameGroups.set(k,[...(nameGroups.get(k)||[]),x])})
    const currentByName=new Map<string,CurrentUser>();nameGroups.forEach((v,k)=>{if(v.length===1)currentByName.set(k,v[0])})
    const emailGroups=new Map<string,CurrentUser[]>()
    current.filter(x=>x.email).forEach(x=>{const k=norm(x.email);emailGroups.set(k,[...(emailGroups.get(k)||[]),x])})
    const currentByEmail=new Map<string,CurrentUser>();emailGroups.forEach((v,k)=>{if(v.length===1)currentByEmail.set(k,v[0])})
    const matchMap=new Map<string,CurrentUser>()
    for(const lu of legacyUsers){
-    const hit=currentByEmail.get(norm(lu.Username))||currentByName.get(norm(lu.FullName))
+    const emailHit=currentByEmail.get(norm(lu.Username))
+    const nameHit=currentByName.get(personNorm(lu.FullName))
+    const hit=emailHit||nameHit
     if(hit)matchMap.set(lu.UserID,hit)
    }
    const rows=current.map(p=>{
-    const lu=legacyUsers.find(x=>matchMap.get(x.UserID)?.id===p.id)
-    const docs=lu?data.Documents.filter(x=>String(x.Created_By||'').trim()===lu.UserID).length:0
-    const tasks=lu?data.Tasks.filter(x=>String(x.AssigneeID||'').trim()===lu.UserID).length:0
-    const logs=lu?data.Workflow_Logs.filter(x=>String(x.ActorID||'').trim()===lu.UserID).length:0
-    return {p,lu,docs,tasks,logs}
+    const lus=legacyUsers.filter(x=>matchMap.get(x.UserID)?.id===p.id)
+    const ids=new Set(lus.map(x=>x.UserID))
+    const docs=data.Documents.filter(x=>ids.has(String(x.Created_By||'').trim())||data.Tasks.some(t=>String(t.AssigneeID||'').trim() && ids.has(String(t.AssigneeID||'').trim()) && String(t.DocID||'')===String(x.DocID||''))).length
+    const tasks=data.Tasks.filter(x=>ids.has(String(x.AssigneeID||'').trim())).length
+    const logs=data.Workflow_Logs.filter(x=>ids.has(String(x.ActorID||'').trim())).length
+    return {p,lus,docs,tasks,logs}
    })
    const unmatchedLegacy=legacyUsers.filter(x=>!matchMap.has(x.UserID))
    const section=document.querySelector<HTMLElement>('#legacy-selection')!
    section.hidden=false
-   section.innerHTML='<h2>2. เลือกบุคลากรที่จะนำข้อมูลเข้า</h2><div class="toolbar"><label><input id="select-all-legacy" type="checkbox"> เลือกทั้งหมดที่จับคู่ได้</label><span id="legacy-selected-count" class="muted"></span></div><div class="table-wrap"><table><thead><tr><th>เลือก</th><th>บุคลากรปัจจุบัน</th><th>ตำแหน่ง</th><th>รหัสเดิม</th><th>หนังสือ</th><th>งาน</th><th>Workflow</th><th>สถานะ</th></tr></thead><tbody>'+rows.map(({p,lu,docs,tasks,logs})=>'<tr><td><input class="legacy-person" type="checkbox" data-user-id="'+esc(p.id)+'" data-legacy-id="'+esc(lu?.UserID||'')+'" '+(lu?'':'disabled')+'></td><td><strong>'+esc(p.full_name||'-')+'</strong><br><small>'+esc(p.email||'')+'</small></td><td>'+esc(p.position||'-')+'</td><td>'+esc(lu?.UserID||'ไม่พบ')+'</td><td>'+docs+'</td><td>'+tasks+'</td><td>'+logs+'</td><td>'+(lu?'<span class="success">พบข้อมูลเดิม</span>':'<span class="muted">ไม่มีข้อมูลตรงกัน</span>')+'</td></tr>').join('')+'</tbody></table></div><section class="panel" style="margin-top:16px"><h3>บุคลากรในระบบเดิมที่ไม่พบในระบบใหม่</h3><p class="muted">จะไม่สร้างบัญชีใหม่ และจะไม่ถูกนำเข้าในรอบนี้</p><div class="table-wrap"><table><thead><tr><th>รหัสเดิม</th><th>ชื่อ</th><th>Username</th></tr></thead><tbody>'+unmatchedLegacy.map(x=>'<tr><td>'+esc(x.UserID)+'</td><td>'+esc(x.FullName)+'</td><td>'+esc(x.Username)+'</td></tr>').join('')+'</tbody></table></div></section><div class="panel" style="margin-top:16px"><h3>3. ขอบเขตข้อมูล</h3><label><input id="include-documents" type="checkbox" checked> หนังสือรับ/ส่ง</label><label><input id="include-tasks" type="checkbox" checked> งานที่มอบหมาย</label><label><input id="include-workflows" type="checkbox" checked> ประวัติ Workflow</label><p class="muted">ไม่รวม Leaves, Research, Evaluation, Projects และโมดูลอื่น</p></div><div class="actions"><button id="stage-legacy">ตรวจสอบและพักข้อมูล</button></div><p id="legacy-stage-message"></p>'
+   section.innerHTML='<h2>2. เลือกบุคลากรที่จะนำข้อมูลเข้า</h2><div class="toolbar"><label><input id="select-all-legacy" type="checkbox"> เลือกทั้งหมดที่จับคู่ได้</label><span id="legacy-selected-count" class="muted"></span></div><div class="table-wrap"><table><thead><tr><th>เลือก</th><th>บุคลากรปัจจุบัน</th><th>ตำแหน่ง</th><th>รหัสเดิม</th><th>หนังสือ</th><th>งาน</th><th>Workflow</th><th>สถานะ</th></tr></thead><tbody>'+rows.map(({p,lus,docs,tasks,logs})=>'<tr><td><input class="legacy-person" type="checkbox" data-user-id="'+esc(p.id)+'" '+(lus.length?'':'disabled')+'></td><td><strong>'+esc(p.full_name||'-')+'</strong><br><small>'+esc(p.email||'')+'</small></td><td>'+esc(p.position||'-')+'</td><td>'+esc(lus.length?lus.map(x=>x.UserID).join(', '):'ไม่พบ')+'</td><td>'+docs+'</td><td>'+tasks+'</td><td>'+logs+'</td><td>'+(lus.length?'<span class="success">พบข้อมูลเดิม '+lus.length+' บัญชี</span>':'<span class="muted">ไม่มีข้อมูลตรงกัน</span>')+'</td></tr>').join('')+'</tbody></table></div><section class="panel" style="margin-top:16px"><h3>บุคลากรในระบบเดิมที่ไม่พบในระบบใหม่</h3><p class="muted">จะไม่สร้างบัญชีใหม่ และจะไม่ถูกนำเข้าในรอบนี้</p><div class="table-wrap"><table><thead><tr><th>รหัสเดิม</th><th>ชื่อ</th><th>Username</th></tr></thead><tbody>'+unmatchedLegacy.map(x=>'<tr><td>'+esc(x.UserID)+'</td><td>'+esc(x.FullName)+'</td><td>'+esc(x.Username)+'</td></tr>').join('')+'</tbody></table></div></section><div class="panel" style="margin-top:16px"><h3>3. ขอบเขตข้อมูล</h3><label><input id="include-documents" type="checkbox" checked> หนังสือรับ/ส่ง</label><label><input id="include-tasks" type="checkbox" checked> งานที่มอบหมาย</label><label><input id="include-workflows" type="checkbox" checked> ประวัติ Workflow</label><p class="muted">ไม่รวม Leaves, Research, Evaluation, Projects และโมดูลอื่น</p></div><div class="actions"><button id="stage-legacy">ตรวจสอบและพักข้อมูล</button></div><p id="legacy-stage-message"></p>'
    const updateCount=()=>{const n=document.querySelectorAll('.legacy-person:checked').length;document.querySelector('#legacy-selected-count')!.textContent='เลือก '+n+' คน'}
    document.querySelectorAll<HTMLInputElement>('.legacy-person').forEach(c=>c.addEventListener('change',updateCount))
    document.querySelector('#select-all-legacy')!.addEventListener('change',e=>{const on=(e.target as HTMLInputElement).checked;document.querySelectorAll<HTMLInputElement>('.legacy-person:not(:disabled)').forEach(c=>c.checked=on);updateCount()})
@@ -56,7 +60,7 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
     const out=document.querySelector('#legacy-stage-message')!
     if(!selected.length){out.textContent='กรุณาเลือกบุคลากรอย่างน้อย 1 คน';out.className='error';return}
     const selectedLegacyIds=new Set<string>()
-    current.forEach(p=>{if(selected.includes(p.id)){const lu=legacyUsers.find(x=>matchMap.get(x.UserID)?.id===p.id);if(lu)selectedLegacyIds.add(lu.UserID)}})
+    legacyUsers.forEach(lu=>{const m=matchMap.get(lu.UserID);if(m&&selected.includes(m.id))selectedLegacyIds.add(lu.UserID)})
     const includeDocs=(document.querySelector<HTMLInputElement>('#include-documents')!).checked
     const includeTasks=(document.querySelector<HTMLInputElement>('#include-tasks')!).checked
     const includeWorkflows=(document.querySelector<HTMLInputElement>('#include-workflows')!).checked
@@ -64,16 +68,30 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
     if(batchError){out.textContent='สร้างชุดนำเข้าไม่สำเร็จ: '+batchError.message;out.className='error';return}
     const records:any[]=[]
     for(const x of data.Users)if(selectedLegacyIds.has(String(x.UserID||'').trim()))records.push({batch_id:batch.id,source_sheet:'Users',legacy_id:String(x.UserID).trim(),payload:x,status:'staged',target_table:'profiles'})
-    if(includeDocs)for(const x of data.Documents)if(selectedLegacyIds.has(String(x.Created_By||'').trim()))records.push({batch_id:batch.id,source_sheet:'Documents',legacy_id:String(x.DocID||'').trim(),payload:x,status:'staged',target_table:'documents'})
+    const selectedTaskDocIds=new Set(data.Tasks.filter(x=>selectedLegacyIds.has(String(x.AssigneeID||'').trim())).map(x=>String(x.DocID||'').trim()).filter(Boolean))
+    if(includeDocs)for(const x of data.Documents)if(selectedLegacyIds.has(String(x.Created_By||'').trim())||selectedTaskDocIds.has(String(x.DocID||'').trim()))records.push({batch_id:batch.id,source_sheet:'Documents',legacy_id:String(x.DocID||'').trim(),payload:x,status:'staged',target_table:'documents'})
     if(includeTasks)for(const x of data.Tasks)if(selectedLegacyIds.has(String(x.AssigneeID||'').trim()))records.push({batch_id:batch.id,source_sheet:'Tasks',legacy_id:String(x.TaskID||'').trim(),payload:x,status:'staged',target_table:'assignments'})
-    if(includeWorkflows)for(const x of data.Workflow_Logs)if(selectedLegacyIds.has(String(x.ActorID||'').trim()))records.push({batch_id:batch.id,source_sheet:'Workflow_Logs',legacy_id:String(x.LogID||'').trim(),payload:x,status:'staged',target_table:'workflows'})
+    const stagedDocIds=new Set(records.filter(x=>x.source_sheet==='Documents').map(x=>x.legacy_id))
+    if(includeWorkflows)for(const x of data.Workflow_Logs)if(selectedLegacyIds.has(String(x.ActorID||'').trim())||stagedDocIds.has(String(x.DocID||'').trim()))records.push({batch_id:batch.id,source_sheet:'Workflow_Logs',legacy_id:String(x.LogID||'').trim(),payload:x,status:'staged',target_table:'workflows'})
     let recError:any=null
     for(let i=0;i<records.length;i+=500){const {error}=await supabase.from('legacy_import_records').insert(records.slice(i,i+500));if(error){recError=error;break}}
     if(recError){await supabase.from('legacy_import_batches').update({status:'failed',error_rows:records.length}).eq('id',batch.id);out.textContent='พักข้อมูลไม่สำเร็จ: '+recError.message;out.className='error';return}
     const maps=Array.from(selectedLegacyIds).map(id=>{const lu=legacyUsers.find(x=>x.UserID===id)!;return {batch_id:batch.id,legacy_user_id:id,legacy_full_name:lu.FullName,current_user_id:matchMap.get(id)!.id,match_method:norm(lu.Username)===norm(matchMap.get(id)!.email)?'email':'full_name',is_confirmed:true}})
     if(maps.length){const {error}=await supabase.from('legacy_identity_map').insert(maps);if(error){out.textContent='บันทึก Identity Mapping ไม่สำเร็จ: '+error.message;out.className='error';return}}
     await supabase.from('legacy_import_batches').update({total_rows:records.length}).eq('id',batch.id)
-    out.textContent='พักข้อมูลสำเร็จ '+records.length+' รายการ · ยังไม่มีการเขียนทับข้อมูลสารบรรณจริง';out.className='success'
+    const {data:check,error:checkError}=await supabase.rpc('validate_legacy_import',{p_batch_id:batch.id})
+    if(checkError){out.textContent='ตรวจสอบ Staging ไม่สำเร็จ: '+checkError.message;out.className='error';return}
+    out.innerHTML='พักข้อมูลและตรวจสอบแล้ว · '+records.length+' รายการ<br><strong>พร้อมนำเข้า: '+esc((check as any)?.ready_rows??0)+' · ข้าม: '+esc((check as any)?.warnings??0)+' · ผิดพลาด: '+esc((check as any)?.errors??0)+'</strong><br><button id="execute-legacy" '+(((check as any)?.errors??0)>0?'disabled':'')+'>ยืนยันนำเข้าข้อมูลจริง</button>'
+    out.className='success'
+    document.querySelector('#execute-legacy')?.addEventListener('click',async()=>{
+      if(!confirm('ยืนยันนำเข้าข้อมูลสารบรรณตามบุคลากรที่เลือก? ข้อมูลที่นำเข้าแล้วจะถูกบันทึกเป็นข้อมูลจริง และไม่ควรนำ Batch เดิมมาซ้ำ'))return
+      const btn=document.querySelector<HTMLButtonElement>('#execute-legacy');if(btn)btn.disabled=true
+      out.textContent='กำลังนำเข้าข้อมูล...'
+      const {data:result,error}=await supabase.rpc('execute_legacy_import',{p_batch_id:batch.id})
+      if(error){out.textContent='นำเข้าไม่สำเร็จ: '+error.message;out.className='error';return}
+      out.innerHTML='นำเข้าสำเร็จ · สถานะ: <strong>'+esc((result as any)?.status||'completed')+'</strong><br>นำเข้า '+esc((result as any)?.imported_rows??0)+' รายการ · ข้าม '+esc((result as any)?.skipped_rows??0)+' · ผิดพลาด '+esc((result as any)?.error_rows??0)+'<br><button id="reload-legacy">โหลดไฟล์ใหม่</button>'
+      document.querySelector('#reload-legacy')?.addEventListener('click',()=>location.reload())
+    })
    })
   }catch(e){msg.textContent='อ่านไฟล์ไม่สำเร็จ: '+(e instanceof Error?e.message:'รูปแบบไฟล์ไม่ถูกต้อง');msg.className='error'}
  })
