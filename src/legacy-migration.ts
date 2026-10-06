@@ -25,8 +25,12 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
    msg.textContent='กำลังอ่านไฟล์และตรวจสอบข้อมูล...'
    const data=await parseWorkbook(file)
    const legacyUsers=(data.Users||[]).map((x:any)=>({UserID:String(x.UserID||'').trim(),Username:String(x.Username||'').trim(),FullName:String(x.FullName||'').trim()})).filter((x:LegacyUser)=>x.UserID)
-   const currentByName=new Map(current.map(x=>[norm(x.full_name),x]))
-   const currentByEmail=new Map(current.filter(x=>x.email).map(x=>[norm(x.email),x]))
+   const nameGroups=new Map<string,CurrentUser[]>()
+   current.forEach(x=>{const k=norm(x.full_name);if(!k)return;nameGroups.set(k,[...(nameGroups.get(k)||[]),x])})
+   const currentByName=new Map<string,CurrentUser>();nameGroups.forEach((v,k)=>{if(v.length===1)currentByName.set(k,v[0])})
+   const emailGroups=new Map<string,CurrentUser[]>()
+   current.filter(x=>x.email).forEach(x=>{const k=norm(x.email);emailGroups.set(k,[...(emailGroups.get(k)||[]),x])})
+   const currentByEmail=new Map<string,CurrentUser>();emailGroups.forEach((v,k)=>{if(v.length===1)currentByEmail.set(k,v[0])})
    const matchMap=new Map<string,CurrentUser>()
    for(const lu of legacyUsers){
     const hit=currentByEmail.get(norm(lu.Username))||currentByName.get(norm(lu.FullName))
@@ -63,7 +67,8 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
     if(includeDocs)for(const x of data.Documents)if(selectedLegacyIds.has(String(x.Created_By||'').trim()))records.push({batch_id:batch.id,source_sheet:'Documents',legacy_id:String(x.DocID||'').trim(),payload:x,status:'staged',target_table:'documents'})
     if(includeTasks)for(const x of data.Tasks)if(selectedLegacyIds.has(String(x.AssigneeID||'').trim()))records.push({batch_id:batch.id,source_sheet:'Tasks',legacy_id:String(x.TaskID||'').trim(),payload:x,status:'staged',target_table:'assignments'})
     if(includeWorkflows)for(const x of data.Workflow_Logs)if(selectedLegacyIds.has(String(x.ActorID||'').trim()))records.push({batch_id:batch.id,source_sheet:'Workflow_Logs',legacy_id:String(x.LogID||'').trim(),payload:x,status:'staged',target_table:'workflows'})
-    const {error:recError}=records.length?await supabase.from('legacy_import_records').insert(records):{error:null}
+    let recError:any=null
+    for(let i=0;i<records.length;i+=500){const {error}=await supabase.from('legacy_import_records').insert(records.slice(i,i+500));if(error){recError=error;break}}
     if(recError){await supabase.from('legacy_import_batches').update({status:'failed',error_rows:records.length}).eq('id',batch.id);out.textContent='พักข้อมูลไม่สำเร็จ: '+recError.message;out.className='error';return}
     const maps=Array.from(selectedLegacyIds).map(id=>{const lu=legacyUsers.find(x=>x.UserID===id)!;return {batch_id:batch.id,legacy_user_id:id,legacy_full_name:lu.FullName,current_user_id:matchMap.get(id)!.id,match_method:norm(lu.Username)===norm(matchMap.get(id)!.email)?'email':'full_name',is_confirmed:true}})
     if(maps.length){const {error}=await supabase.from('legacy_identity_map').insert(maps);if(error){out.textContent='บันทึก Identity Mapping ไม่สำเร็จ: '+error.message;out.className='error';return}}
