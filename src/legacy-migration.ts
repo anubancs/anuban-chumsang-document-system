@@ -9,15 +9,14 @@ type LegacyUser={UserID:string;Username:string;FullName:string}
 function rowsOf(wb:XLSX.WorkBook,name:string){const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json<any>(ws,{defval:''}):[]}
 function parseWorkbook(file:File):Promise<{Users:any[];Documents:any[];Workflow_Logs:any[];Tasks:any[]}>{return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:'array'});resolve({Users:rowsOf(wb,'Users'),Documents:rowsOf(wb,'Documents'),Workflow_Logs:rowsOf(wb,'Workflow_Logs'),Tasks:rowsOf(wb,'Tasks')})}catch(e){reject(e)}};r.onerror=()=>reject(r.error);r.readAsArrayBuffer(file)})}
 
-export async function renderLegacyMigration(userId:string){
+export async function renderLegacyMigration(userId:string,onBack:()=>void){
  const {data:profiles,error}=await supabase.from('profiles').select('id,full_name,email,position').order('full_name')
  if(error){alert('โหลดรายชื่อบุคลากรไม่สำเร็จ: '+error.message);return}
  const current=(profiles||[]) as CurrentUser[]
  const app=document.querySelector<HTMLDivElement>('#app')!
  app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button id="back-migration">← กลับภาพรวม</button><button class="active">นำเข้าข้อมูลสารบรรณเดิม</button></aside><main class="page"><section class="welcome"><h1>นำเข้าข้อมูลสารบรรณจากระบบเดิม</h1><p class="muted">เลือกเฉพาะบุคลากรที่ยังมีบัญชีอยู่ในระบบใหม่ · ข้อมูลวันลาและโมดูลอื่นจะไม่ถูกนำเข้า</p></section><section class="panel"><h2>1. เลือกไฟล์ระบบเดิม</h2><p class="muted">รองรับ Excel .xlsx/.xls · ระบบจะตรวจสอบและพักข้อมูลไว้ก่อน ยังไม่เขียนลงหนังสือรับ/ส่งจริง</p><input id="legacy-file" type="file" accept=".xlsx,.xls"><p id="legacy-file-message" class="muted"></p></section><section id="legacy-selection" class="panel" hidden></section></main></div></div>'
  document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
- document.querySelector('#back-migration')!.addEventListener('click',()=>renderDashboardForMigrationBack())
- const renderDashboardForMigrationBack=()=>{}
+ document.querySelector('#back-migration')!.addEventListener('click',onBack)
  const fileInput=document.querySelector<HTMLInputElement>('#legacy-file')!
  fileInput.addEventListener('change',async()=>{
   const file=fileInput.files?.[0];if(!file)return
