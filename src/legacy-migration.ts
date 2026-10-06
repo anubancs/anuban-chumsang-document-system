@@ -88,7 +88,7 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
     out.innerHTML+='<p class="success"><strong>นำเข้าเสร็จสิ้น</strong> · สถานะ '+esc(er.status||'completed')+' · นำเข้า '+esc(er.imported_rows??0)+' · ข้าม '+esc(er.skipped_rows??0)+' · ผิดพลาด '+esc(er.error_rows??0)+'</p>'
     await renderExistingBatches()
    })
-  })
+  }))
  }
  await renderExistingBatches()
  const fileInput=document.querySelector<HTMLInputElement>('#legacy-file')!
