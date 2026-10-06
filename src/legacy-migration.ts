@@ -39,9 +39,58 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
  if(error){alert('โหลดรายชื่อบุคลากรไม่สำเร็จ: '+error.message);return}
  const current=(profiles||[]).map((x:any)=>({...x,role_code:x.user_roles?.[0]?.roles?.code||null})) as CurrentUser[]
  const app=document.querySelector<HTMLDivElement>('#app')!
- app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button id="back-migration">← กลับภาพรวม</button><button class="active">นำเข้าข้อมูลสารบรรณเดิม</button></aside><main class="page"><section class="welcome"><h1>นำเข้าข้อมูลสารบรรณจากระบบเดิม</h1><p class="muted">เลือกเฉพาะบุคลากรที่ยังมีบัญชีอยู่ในระบบใหม่ · ข้อมูลวันลาและโมดูลอื่นจะไม่ถูกนำเข้า</p></section><section class="panel"><h2>1. เลือกไฟล์ระบบเดิม</h2><p class="muted">รองรับ Excel .xlsx/.xls · ระบบจะตรวจสอบและพักข้อมูลไว้ก่อน ยังไม่เขียนลงหนังสือรับ/ส่งจริง</p><input id="legacy-file" type="file" accept=".xlsx,.xls"><p id="legacy-file-message" class="muted"></p></section><section id="legacy-selection" class="panel" hidden></section></main></div></div>'
+ app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button id="back-migration">← กลับภาพรวม</button><button class="active">นำเข้าข้อมูลสารบรรณเดิม</button></aside><main class="page"><section class="welcome"><h1>นำเข้าข้อมูลสารบรรณจากระบบเดิม</h1><p class="muted">เลือกเฉพาะบุคลากรที่ยังมีบัญชีอยู่ในระบบใหม่ · ข้อมูลวันลาและโมดูลอื่นจะไม่ถูกนำเข้า</p></section><section class="panel" id="legacy-existing-batches">
+<h2>1. ชุดข้อมูลที่เตรียมไว้แล้ว</h2>
+<p class="muted">เลือก Batch ที่พักข้อมูลไว้แล้วเพื่อตรวจสอบก่อนนำเข้าจริง · ไม่ต้องอัปโหลดไฟล์ซ้ำ</p>
+<div id="legacy-batch-list"><p class="muted">กำลังโหลดชุดข้อมูล...</p></div>
+<div id="legacy-batch-result" style="margin-top:16px"></div>
+</section>
+<section class="panel"><h2>2. นำเข้าไฟล์ระบบเดิมชุดใหม่</h2><p class="muted">รองรับ Excel .xlsx/.xls · ระบบจะตรวจสอบและพักข้อมูลไว้ก่อน ยังไม่เขียนลงหนังสือรับ/ส่งจริง</p><input id="legacy-file" type="file" accept=".xlsx,.xls"><p id="legacy-file-message" class="muted"></p></section><section id="legacy-selection" class="panel" hidden></section></main></div></div>'
  document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
  document.querySelector('#back-migration')!.addEventListener('click',onBack)
+
+ const renderExistingBatches=async()=>{
+  const list=document.querySelector<HTMLElement>('#legacy-batch-list')
+  const result=document.querySelector<HTMLElement>('#legacy-batch-result')
+  if(!list)return
+  const {data:batches,error}=await supabase.from('legacy_import_batches')
+   .select('id,source_name,source_version,status,total_rows,imported_rows,skipped_rows,error_rows,created_at,completed_at')
+   .order('created_at',{ascending:false}).limit(20)
+  if(error){list.innerHTML='<p class="error">โหลด Batch ไม่สำเร็จ: '+esc(error.message)+'</p>';return}
+  if(!batches?.length){list.innerHTML='<p class="muted">ยังไม่มี Batch ที่พักข้อมูลไว้</p>';return}
+  list.innerHTML='<div class="table-wrap"><table><thead><tr><th>วันที่</th><th>ไฟล์</th><th>สถานะ</th><th>รายการ</th><th>นำเข้า</th><th>ข้าม</th><th>ผิดพลาด</th><th>การดำเนินการ</th></tr></thead><tbody>'+
+   batches.map((b:any)=>'<tr><td>'+esc(new Date(b.created_at).toLocaleString('th-TH'))+'</td><td><strong>'+esc(b.source_name||'-')+'</strong><br><small>'+esc(b.id)+'</small></td><td>'+esc(b.status||'-')+'</td><td>'+esc(b.total_rows??0)+'</td><td>'+esc(b.imported_rows??0)+'</td><td>'+esc(b.skipped_rows??0)+'</td><td>'+esc(b.error_rows??0)+'</td><td><button class="secondary small" data-validate-batch="'+esc(b.id)+'">ตรวจสอบ Batch</button></td></tr>').join('')+
+   '</tbody></table></div>'
+  list.querySelectorAll<HTMLButtonElement>('[data-validate-batch]').forEach(btn=>btn.addEventListener('click',async()=>{
+   const batchId=btn.dataset.validateBatch!
+   const out=document.querySelector<HTMLElement>('#legacy-batch-result')!
+   setBusy(btn,true,'กำลังตรวจสอบ...')
+   out.innerHTML='<p class="muted">กำลัง Validate และตรวจสอบความซ้ำ/Identity Mapping...</p>'
+   const {data:check,error:checkError}=await supabase.rpc('validate_legacy_import',{p_batch_id:batchId})
+   setBusy(btn,false)
+   if(checkError){out.innerHTML='<p class="error">ตรวจสอบไม่สำเร็จ: '+esc(checkError.message)+'</p>';return}
+   const r:any=check||{}
+   const ok=(r.errors??0)===0
+   out.innerHTML='<div class="panel"><h3>ผลการตรวจสอบ Batch</h3>'+
+    '<div class="detail-grid"><div><strong>ทั้งหมด:</strong> '+esc(r.total_rows??0)+'</div><div><strong>พร้อมนำเข้า:</strong> '+esc(r.ready_rows??0)+'</div><div><strong>รายการที่ต้องข้าม:</strong> '+esc(r.warnings??0)+'</div><div><strong>ผิดพลาด:</strong> '+esc(r.errors??0)+'</div><div><strong>ผู้สร้างหนังสือไม่พบ:</strong> '+esc(r.missing_creator??0)+'</div><div><strong>ผู้รับผิดชอบไม่พบ:</strong> '+esc(r.missing_assignee??0)+'</div><div><strong>หนังสือแม่ไม่พบ:</strong> '+esc(r.missing_parent??0)+'</div><div><strong>ผู้ดำเนินการ Workflow ไม่พบ:</strong> '+esc(r.missing_actor??0)+'</div><div><strong>หนังสือซ้ำ:</strong> '+esc(r.duplicate_documents??0)+'</div></div>'+
+    '<p class="'+(ok?'success':'error')+'">'+(ok?'ผ่านการตรวจสอบขั้นต้น สามารถเตรียม Execute ได้':'ยังไม่ควร Execute เพราะมีรายการผิดพลาด')+'</p>'+
+    '<div class="actions">'+(ok?'<button id="execute-existing-batch">ยืนยันนำเข้าข้อมูลจริง</button>':'')+'<button id="refresh-existing-batches" class="secondary">รีเฟรช Batch</button></div>'+
+    '<p class="muted">ระบบจะไม่ย้ายไฟล์จาก Google Drive และจะเก็บ URL ไฟล์เดิมไว้เป็นข้อมูลอ้างอิง</p></div>'
+   document.querySelector('#refresh-existing-batches')?.addEventListener('click',()=>renderExistingBatches())
+   document.querySelector('#execute-existing-batch')?.addEventListener('click',async()=>{
+    if(!confirm('ยืนยันนำเข้า Batch นี้เข้าสู่ข้อมูลจริง? การดำเนินการนี้จะสร้างหนังสือ งานมอบหมาย และประวัติ Workflow จากข้อมูลที่ผ่านการตรวจสอบแล้ว'))return
+    const execBtn=document.querySelector<HTMLButtonElement>('#execute-existing-batch')
+    if(execBtn)setBusy(execBtn,true,'กำลังนำเข้า...')
+    out.querySelector('p:last-child')!.textContent='กำลังนำเข้าข้อมูลจริง... กรุณาอย่าปิดหน้าต่างนี้'
+    const {data:execResult,error:execError}=await supabase.rpc('execute_legacy_import',{p_batch_id:batchId})
+    if(execError){out.innerHTML+='<p class="error">นำเข้าไม่สำเร็จ: '+esc(execError.message)+'</p>';if(execBtn)setBusy(execBtn,false);return}
+    const er:any=execResult||{}
+    out.innerHTML+='<p class="success"><strong>นำเข้าเสร็จสิ้น</strong> · สถานะ '+esc(er.status||'completed')+' · นำเข้า '+esc(er.imported_rows??0)+' · ข้าม '+esc(er.skipped_rows??0)+' · ผิดพลาด '+esc(er.error_rows??0)+'</p>'
+    await renderExistingBatches()
+   })
+  })
+ }
+ await renderExistingBatches()
  const fileInput=document.querySelector<HTMLInputElement>('#legacy-file')!
  fileInput.addEventListener('change',async()=>{
   const file=fileInput.files?.[0];if(!file)return
