@@ -8,7 +8,31 @@ type CurrentUser={id:string;full_name:string|null;email:string|null;position:str
 type LegacyUser={UserID:string;Username:string;FullName:string}
 
 function rowsOf(wb:XLSX.WorkBook,name:string){const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json<any>(ws,{defval:''}):[]}
-function parseWorkbook(file:File):Promise<{Users:any[];Documents:any[];Workflow_Logs:any[];Tasks:any[]}>{return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:'array'});resolve({Users:rowsOf(wb,'Users'),Documents:rowsOf(wb,'Documents'),Workflow_Logs:rowsOf(wb,'Workflow_Logs'),Tasks:rowsOf(wb,'Tasks')})}catch(e){reject(e)}};r.onerror=()=>reject(r.error);r.readAsArrayBuffer(file)})}
+function excelDateToISO(v:unknown):unknown{
+ if(v===null||v===undefined||v==='')return v
+ if(v instanceof Date)return isNaN(v.getTime())?null:v.toISOString()
+ if(typeof v==='number'&&isFinite(v)){
+  const ms=Math.round((v-25569)*86400000)
+  const d=new Date(ms)
+  return isNaN(d.getTime())?null:d.toISOString()
+ }
+ if(typeof v==='string'){
+  const s=v.trim()
+  if(/^\\d+(?:\\.\\d+)?$/.test(s)){
+   const n=Number(s);if(isFinite(n)&&n>20000&&n<80000){const d=new Date(Math.round((n-25569)*86400000));if(!isNaN(d.getTime()))return d.toISOString()}
+  }
+  return s
+ }
+ return v
+}
+function normalizeLegacyRow(sheet:string,x:any){
+ const y={...x}
+ if(sheet==='Documents'){y.Date_In=excelDateToISO(y.Date_In);y.Timestamp=excelDateToISO(y.Timestamp)}
+ if(sheet==='Tasks'){y.Finish_Time=excelDateToISO(y.Finish_Time)}
+ if(sheet==='Workflow_Logs'){y.Timestamp=excelDateToISO(y.Timestamp)}
+ return y
+}
+function parseWorkbook(file:File):Promise<{Users:any[];Documents:any[];Workflow_Logs:any[];Tasks:any[]}>{return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:'array',cellDates:true});resolve({Users:rowsOf(wb,'Users').map(x=>normalizeLegacyRow('Users',x)),Documents:rowsOf(wb,'Documents').map(x=>normalizeLegacyRow('Documents',x)),Workflow_Logs:rowsOf(wb,'Workflow_Logs').map(x=>normalizeLegacyRow('Workflow_Logs',x)),Tasks:rowsOf(wb,'Tasks').map(x=>normalizeLegacyRow('Tasks',x))})}catch(e){reject(e)}};r.onerror=()=>reject(r.error);r.readAsArrayBuffer(file)})}
 
 export async function renderLegacyMigration(userId:string,onBack:()=>void){
  const {data:profiles,error}=await supabase.from('profiles').select('id,full_name,email,position,user_roles!user_roles_user_id_fkey(roles!user_roles_role_id_fkey(code))').order('full_name')
