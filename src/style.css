@@ -30,3 +30,7 @@
 .notification-item.unread strong{color:#0b3b82}
 .notification-item:hover{background:#f1f5f9}
 .notification-empty{color:#64748b}
+
+
+/* Document status and urgency badges */
+.importance-badge{display:inline-flex;flex-direction:column;gap:2px;vertical-align:middle;padding:6px 10px;border-radius:9px;border:1px solid currentColor;font-weight:700;line-height:1.2}.importance-badge strong{font-size:.95rem}.importance-badge small{font-size:.75rem;font-weight:500;opacity:.9}.status-received,.status-registered{color:#1d4ed8;background:#eff6ff}.status-assigned,.status-approved{color:#7e22ce;background:#faf5ff}.status-in-progress,.status-pending{color:#c2410c;background:#fff7ed}.status-completed{color:#15803d;background:#f0fdf4}.status-archived,.status-draft{color:#475569;background:#f8fafc}.status-cancelled{color:#b91c1c;background:#fef2f2}.status-sent{color:#047857;background:#ecfdf5}.status-unknown{color:#475569;background:#f8fafc}.priority-normal{color:#15803d;background:#f0fdf4}.priority-urgent{color:#c2410c;background:#fff7ed}.priority-very-urgent{color:#dc2626;background:#fef2f2}.priority-most-urgent{color:#991b1b;background:#fee2e2;font-weight:800}.priority-unknown{color:#64748b;background:#f8fafc}@media(max-width:700px){.importance-badge{display:flex}}
