@@ -11,7 +11,7 @@ function rowsOf(wb:XLSX.WorkBook,name:string){const ws=wb.Sheets[name];return ws
 function parseWorkbook(file:File):Promise<{Users:any[];Documents:any[];Workflow_Logs:any[];Tasks:any[]}>{return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:'array'});resolve({Users:rowsOf(wb,'Users'),Documents:rowsOf(wb,'Documents'),Workflow_Logs:rowsOf(wb,'Workflow_Logs'),Tasks:rowsOf(wb,'Tasks')})}catch(e){reject(e)}};r.onerror=()=>reject(r.error);r.readAsArrayBuffer(file)})}
 
 export async function renderLegacyMigration(userId:string,onBack:()=>void){
- const {data:profiles,error}=await supabase.from('profiles').select('id,full_name,email,position,user_roles(roles(code))').order('full_name')
+ const {data:profiles,error}=await supabase.from('profiles').select('id,full_name,email,position,user_roles!user_roles_user_id_fkey(roles!user_roles_role_id_fkey(code))').order('full_name')
  if(error){alert('โหลดรายชื่อบุคลากรไม่สำเร็จ: '+error.message);return}
  const current=(profiles||[]).map((x:any)=>({...x,role_code:x.user_roles?.[0]?.roles?.code||null})) as CurrentUser[]
  const app=document.querySelector<HTMLDivElement>('#app')!
