@@ -4,16 +4,16 @@ import { supabase } from './lib/supabase'
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] as string))
 const norm=(v:unknown)=>String(v??'').trim().replace(/\s+/g,' ').toLowerCase()
 const personNorm=(v:unknown)=>norm(v).replace(/^(ผอ\.|นางสาว|นาง|นาย)\s*/,'').replace(/^รอง\s*[ฯ.]\s*/,'').replace(/\s+/g,'')
-type CurrentUser={id:string;full_name:string|null;email:string|null;position:string|null}
+type CurrentUser={id:string;full_name:string|null;email:string|null;position:string|null;role_code?:string|null}
 type LegacyUser={UserID:string;Username:string;FullName:string}
 
 function rowsOf(wb:XLSX.WorkBook,name:string){const ws=wb.Sheets[name];return ws?XLSX.utils.sheet_to_json<any>(ws,{defval:''}):[]}
 function parseWorkbook(file:File):Promise<{Users:any[];Documents:any[];Workflow_Logs:any[];Tasks:any[]}>{return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>{try{const wb=XLSX.read(r.result,{type:'array'});resolve({Users:rowsOf(wb,'Users'),Documents:rowsOf(wb,'Documents'),Workflow_Logs:rowsOf(wb,'Workflow_Logs'),Tasks:rowsOf(wb,'Tasks')})}catch(e){reject(e)}};r.onerror=()=>reject(r.error);r.readAsArrayBuffer(file)})}
 
 export async function renderLegacyMigration(userId:string,onBack:()=>void){
- const {data:profiles,error}=await supabase.from('profiles').select('id,full_name,email,position').order('full_name')
+ const {data:profiles,error}=await supabase.from('profiles').select('id,full_name,email,position,user_roles(roles(code))').order('full_name')
  if(error){alert('โหลดรายชื่อบุคลากรไม่สำเร็จ: '+error.message);return}
- const current=(profiles||[]) as CurrentUser[]
+ const current=(profiles||[]).map((x:any)=>({...x,role_code:x.user_roles?.[0]?.roles?.code||null})) as CurrentUser[]
  const app=document.querySelector<HTMLDivElement>('#app')!
  app.innerHTML='<div class="app-shell"><header class="topbar"><div><strong>ระบบสารบรรณอิเล็กทรอนิกส์</strong><small>โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</small></div><button id="logout" class="secondary">ออกจากระบบ</button></header><div class="body-shell"><aside class="sidebar"><button id="back-migration">← กลับภาพรวม</button><button class="active">นำเข้าข้อมูลสารบรรณเดิม</button></aside><main class="page"><section class="welcome"><h1>นำเข้าข้อมูลสารบรรณจากระบบเดิม</h1><p class="muted">เลือกเฉพาะบุคลากรที่ยังมีบัญชีอยู่ในระบบใหม่ · ข้อมูลวันลาและโมดูลอื่นจะไม่ถูกนำเข้า</p></section><section class="panel"><h2>1. เลือกไฟล์ระบบเดิม</h2><p class="muted">รองรับ Excel .xlsx/.xls · ระบบจะตรวจสอบและพักข้อมูลไว้ก่อน ยังไม่เขียนลงหนังสือรับ/ส่งจริง</p><input id="legacy-file" type="file" accept=".xlsx,.xls"><p id="legacy-file-message" class="muted"></p></section><section id="legacy-selection" class="panel" hidden></section></main></div></div>'
  document.querySelector('#logout')!.addEventListener('click',()=>supabase.auth.signOut())
@@ -36,7 +36,18 @@ export async function renderLegacyMigration(userId:string,onBack:()=>void){
    for(const lu of legacyUsers){
     const emailHit=currentByEmail.get(norm(lu.Username))
     const nameHit=currentByName.get(personNorm(lu.FullName))
-    const hit=emailHit||nameHit
+    let hit=emailHit||nameHit
+    if(!emailHit && !nameHit){
+      const candidates=(nameGroups.get(personNorm(lu.FullName))||[])
+      const roleMap:any={Director:'director',Deputy:'deputy_director',Admin:'officer',PersonnelHead:'staff',AcademicHead:'staff',Teacher:'staff'}
+      const wanted=roleMap[lu.Role]
+      if(wanted){const roleHits=candidates.filter(x=>x.role_code===wanted);if(roleHits.length===1)hit=roleHits[0]}
+    } else if(!emailHit){
+      const candidates=nameGroups.get(personNorm(lu.FullName))||[]
+      const roleMap:any={Director:'director',Deputy:'deputy_director',Admin:'officer',PersonnelHead:'staff',AcademicHead:'staff',Teacher:'staff'}
+      const wanted=roleMap[lu.Role]
+      if(wanted){const roleHits=candidates.filter(x=>x.role_code===wanted);if(roleHits.length===1)hit=roleHits[0]}
+    }
     if(hit)matchMap.set(lu.UserID,hit)
    }
    const rows=current.map(p=>{
