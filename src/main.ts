@@ -471,6 +471,7 @@ async function boot(){
    else if(state?.screen==='incoming'||state?.screen==='outgoing') await renderDocumentList(state.screen,session.user.id,state.meta?.filters||{});
    else if(state?.screen==='users') await renderUsers(session.user.id);
    else if(state?.screen==='audit') await renderAuditLog(session.user.id,state.meta?.filters||{});
+   else if(state?.screen==='legacy-migration') await renderLegacyMigration(session.user.id,()=>renderDashboard(session.user.id));
    else if(state?.screen==='dashboard'||state?.screen==='tasks') await renderDashboard(session.user.id,state.screen);
    else await handleSession(session,false);
  }else{
