@@ -27,6 +27,8 @@ let notificationChannel:any=null
 let notificationUserId:string|null=null
 let notificationRows:NotificationRow[]=[]
 let notificationObserver:MutationObserver|undefined
+let deadlineNotificationTimer:number|undefined
+async function refreshDeadlineNotifications(){try{await supabase.rpc('notify_due_assignments')}catch{}}
 function notificationTime(v:string){try{return new Intl.DateTimeFormat('th-TH',{dateStyle:'short',timeStyle:'short'}).format(new Date(v))}catch{return v}}
 function renderNotificationWidget(){
  const topbar=document.querySelector<HTMLElement>('.topbar')
@@ -80,10 +82,14 @@ async function setupNotifications(userId:string){
    notificationObserver=new MutationObserver(()=>{if(!app.querySelector('#notification-widget')){renderNotificationWidget();renderNotificationList()}})
    notificationObserver.observe(app,{childList:true,subtree:true})
  }
+ await refreshDeadlineNotifications()
+ if(deadlineNotificationTimer)window.clearInterval(deadlineNotificationTimer)
+ deadlineNotificationTimer=window.setInterval(refreshDeadlineNotifications,5*60*1000)
  renderNotificationWidget();renderNotificationList()
 }
 async function teardownNotifications(){
  if(notificationChannel){await supabase.removeChannel(notificationChannel);notificationChannel=null}
+ if(deadlineNotificationTimer){window.clearInterval(deadlineNotificationTimer);deadlineNotificationTimer=undefined}
  notificationUserId=null;notificationRows=[]
  if(notificationObserver){notificationObserver.disconnect();notificationObserver=undefined}
 }
