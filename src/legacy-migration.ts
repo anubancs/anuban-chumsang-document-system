@@ -4,6 +4,7 @@ import { supabase } from './lib/supabase'
 const esc=(v:unknown)=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] as string))
 const norm=(v:unknown)=>String(v??'').trim().replace(/\s+/g,' ').toLowerCase()
 const personNorm=(v:unknown)=>norm(v).replace(/^(ผอ\.|นางสาว|นาง|นาย)\s*/,'').replace(/^รอง\s*[ฯ.]\s*/,'').replace(/\s+/g,'')
+const setBusy=(button:HTMLButtonElement,busy:boolean,label:string)=>{button.disabled=busy;if(busy)button.dataset.originalLabel??=button.textContent||'';button.textContent=busy?label:(button.dataset.originalLabel||'ตรวจสอบ Batch')}
 type CurrentUser={id:string;full_name:string|null;email:string|null;position:string|null;role_code?:string|null}
 type LegacyUser={UserID:string;Username:string;FullName:string}
 
