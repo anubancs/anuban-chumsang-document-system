@@ -52,7 +52,7 @@
   if(error)throw error;members=rows||[];
   $('#members').innerHTML=members.map(m=>{
    const group=groups.find(g=>g.id===m.group_id);
-   return '<article class="border rounded-xl p-4 grid md:grid-cols-[1fr_220px_auto] gap-3 items-center"><div><b class="text-sm break-all">'+esc(m.user_id)+'</b><p class="text-xs opacity-60">บทบาท: '+esc(m.role)+(m.role==='owner'?' · สิทธิ์สูงสุด':'')+'</p></div><select class="rounded-lg border p-2 text-black" data-member-group="'+m.user_id+'" '+(m.role==='owner'?'disabled':'')+'><option value="">ยังไม่อยู่ในกลุ่ม</option>'+groups.map(g=>'<option value="'+g.id+'" '+(m.group_id===g.id?'selected':'')+'>'+esc(g.name)+'</option>').join('')+'</select><button class="text-red-700 underline text-sm" data-remove-member="'+m.user_id+'" '+(m.role==='owner'?'disabled':'')+'>ถอนสิทธิ์</button></article>';
+   return '<article class="border rounded-xl p-4 grid md:grid-cols-[1fr_220px_auto] gap-3 items-center"><div><b class="text-sm break-all">'+esc(userMap.get(m.user_id)?.email||'ไม่พบอีเมลบัญชี')+'</b><p class="text-xs opacity-60 break-all">User ID: '+esc(m.user_id)+'<br>บทบาท: '+esc(m.role)+(m.role==='owner'?' · สิทธิ์สูงสุด':'')+'</p></div><select class="rounded-lg border p-2 text-black" data-member-group="'+m.user_id+'" '+(m.role==='owner'?'disabled':'')+'><option value="">ยังไม่อยู่ในกลุ่ม</option>'+groups.map(g=>'<option value="'+g.id+'" '+(m.group_id===g.id?'selected':'')+'>'+esc(g.name)+'</option>').join('')+'</select><button class="text-red-700 underline text-sm" data-remove-member="'+m.user_id+'" '+(m.role==='owner'?'disabled':'')+'>ถอนสิทธิ์</button></article>';
   }).join('')||'<p class="opacity-60">ยังไม่มีสมาชิกผู้ดูแล</p>';
  }
  async function loadPermissions(){
