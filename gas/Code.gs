@@ -45,7 +45,7 @@ function uploadImage_(p) {
   if (!encoded) throw new Error('ไม่พบข้อมูลภาพ');
   const bytes = Utilities.base64Decode(encoded);
   if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new Error('ขนาดภาพต้องไม่เกิน 6 MB');
-  const original = String(p.filename || 'image').replace(/[\\/:*?"<>|#%{}^~\[\]]/g,'_').slice(0,100);
+  const original = String(p.filename || 'image').replace(/[^a-zA-Z0-9._ -]/g,'_').slice(0,100);
   const ext = mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1];
   const filename = Utilities.formatDate(new Date(),'Asia/Bangkok','yyyyMMdd_HHmmss') + '_' +
     Utilities.getUuid().slice(0,8) + '_' + original.replace(/\.[^.]+$/,'') + '.' + ext;
