@@ -17,7 +17,7 @@
     <form id="news-form" class="grid md:grid-cols-2 gap-3">
       <input class="rounded-xl p-3 text-black" name="title" placeholder="หัวข้อข่าว" required maxlength="250">
       <input class="rounded-xl p-3 text-black" name="slug" placeholder="slug ภาษาอังกฤษ" required pattern="[a-z0-9-]+" maxlength="250">
-      <input class="rounded-xl p-3 text-black md:col-span-2" name="cover_image_url" type="url" placeholder="URL ภาพหน้าปก (Google Drive share/direct URL)">
+      <input class="rounded-xl p-3 text-black md:col-span-2" name="cover_image_url" type="url" placeholder="URL ภาพหน้าปก (ระบบเติมให้อัตโนมัติเมื่ออัปโหลด)"><label class="md:col-span-2 text-sm">หรือเลือกภาพหน้าปกจากเครื่อง (JPG/PNG/WEBP/GIF ไม่เกิน 6 MB)<input id="news-cover-file" class="block mt-2" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-drive-upload="news" data-drive-target="#news-form [name=cover_image_url]" data-drive-status="#news-cover-status"></label><p id="news-cover-status" class="md:col-span-2 text-sm opacity-70" role="status"></p>
       <textarea class="rounded-xl p-3 text-black md:col-span-2" name="excerpt" placeholder="คำโปรย" maxlength="500"></textarea>
       <textarea class="rounded-xl p-3 text-black md:col-span-2" name="content" rows="6" placeholder="เนื้อหาข่าว" required></textarea>
       <div class="flex flex-wrap gap-3 md:col-span-2"><button class="brand-gradient text-white rounded-xl px-5 py-3">บันทึกฉบับร่าง</button><button id="publish-news" type="button" class="btn-gold rounded-xl px-5 py-3">บันทึกและเผยแพร่</button></div>
@@ -33,7 +33,7 @@
       <input class="rounded-xl p-3 text-black" name="full_name" placeholder="ชื่อ-นามสกุล" required maxlength="200">
       <input class="rounded-xl p-3 text-black" name="position" placeholder="ตำแหน่ง" required maxlength="200">
       <input class="rounded-xl p-3 text-black" name="department" placeholder="กลุ่มสาระ/กลุ่มงาน">
-      <input class="rounded-xl p-3 text-black" name="photo_url" type="url" placeholder="URL รูปภาพ">
+      <div><input class="w-full rounded-xl p-3 text-black" name="photo_url" type="url" placeholder="URL รูปภาพ"><label class="block text-sm mt-2">อัปโหลดรูปบุคลากร<input id="staff-photo-file" class="block mt-1" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-drive-upload="personnel" data-drive-target="#staff-form [name=photo_url]" data-drive-status="#staff-photo-status"></label><p id="staff-photo-status" class="text-xs mt-1 opacity-70" role="status"></p></div>
       <input class="rounded-xl p-3 text-black md:col-span-2" name="personal_website_url" type="url" placeholder="เว็บไซต์ส่วนตัว (https://...)">
       <textarea class="rounded-xl p-3 text-black md:col-span-2" name="bio" rows="3" placeholder="ประวัติย่อ"></textarea>
       <button class="brand-gradient text-white rounded-xl p-3 md:col-span-2">เพิ่มบุคลากร (ยังไม่เผยแพร่)</button>
@@ -45,7 +45,7 @@
   </section>
   <p id="status" role="status" class="text-sm opacity-60 mt-5"></p>
 </main>
-<script src="../assets/js/supabase.js"></script>
+<script src="../assets/js/supabase.js"></script><script src="../assets/js/drive-upload.js"></script>
 <script>
 (async()=>{
   const db=schoolSupabase, $=s=>document.querySelector(s);
