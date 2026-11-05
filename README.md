@@ -74,7 +74,7 @@
 3. ไปที่ **Project Settings → Script Properties** แล้วเพิ่ม:
    - `GEMINI_API_KEY` — API Key จาก Google AI Studio (เก็บเป็นความลับ ห้ามใส่ใน GitHub)
    - `SUPABASE_PUBLISHABLE_KEY` — ใช้ค่า Publishable Key เดิมที่ตั้งไว้สำหรับอัปโหลดภาพ
-   - `GEMINI_MODEL` — ไม่บังคับ ค่าเริ่มต้น `gemini-2.5-flash`
+   - `GEMINI_MODEL` — ไม่บังคับ ค่าเริ่มต้น `gemini-3.5-flash-lite`
    - `AI_DAILY_LIMIT` — ไม่บังคับ ค่าเริ่มต้น 100 คำถามต่อวัน
 4. คัดลอกโค้ดล่าสุดจาก `gas/Code.gs` ใน GitHub ไปแทนที่โค้ดใน Apps Script Project เดิม แล้วบันทึก
 5. เลือก **Deploy → Manage deployments → Edit → New version → Deploy** เพื่อให้ Web App ใช้โค้ดล่าสุด (URL เดิมไม่ต้องเปลี่ยน)
