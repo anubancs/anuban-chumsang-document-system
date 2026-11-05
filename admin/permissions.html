@@ -16,8 +16,9 @@
   <form id="add-member" class="grid md:grid-cols-[minmax(0,2fr)_1fr_auto] gap-3 mb-5">
    <select name="user_id" id="auth-user-select" class="rounded-xl border p-3 text-black" required><option value="">กำลังโหลดรายชื่อผู้ใช้...</option></select>
    <select name="group_id" id="member-group" class="rounded-xl border p-3 text-black" required></select>
-   <button class="brand-gradient text-white rounded-xl px-5 py-3">เพิ่มสมาชิก</button>
+   <button id="add-member-button" type="submit" class="brand-gradient text-white rounded-xl px-5 py-3">เพิ่มสมาชิก</button>
   </form>
+  <p id="member-status" role="status" aria-live="polite" class="text-sm mt-2 text-amber-700"></p>
   <div id="members" class="space-y-3">กำลังโหลด...</div>
  </section>
  <section class="glass rounded-2xl p-6">
@@ -53,6 +54,7 @@
   const assigned=new Set(members.map(m=>m.user_id));
   const available=authUsers.filter(u=>!assigned.has(u.user_id));
   $('#auth-user-select').innerHTML='<option value="">เลือกบัญชีผู้ใช้ ('+available.length+' บัญชีที่ยังไม่ได้กำหนดสิทธิ์)</option>'+available.map(u=>'<option value="'+u.user_id+'">'+esc(u.full_name||'ไม่ระบุชื่อ')+(u.position?' · '+esc(u.position):'')+' · '+esc(u.email||'ไม่มีอีเมล')+'</option>').join('');
+  $('#member-status').textContent=available.length?'พบ '+available.length+' บัญชีที่สามารถเพิ่มเป็นสมาชิกได้':'ไม่พบบัญชีที่ยังไม่ได้เพิ่ม';
  }
  async function loadMembers(){
   const {data:rows,error}=await db.from('admin_users').select('user_id,role,group_id,created_at').order('created_at');
@@ -71,10 +73,23 @@
   $('#permission-matrix').innerHTML='<table class="w-full text-sm"><thead><tr class="border-b"><th class="text-left p-3">หมวดข้อมูล</th>'+actions.map(a=>'<th class="p-3">'+a[1]+'</th>').join('')+'</tr></thead><tbody>'+modules.map(([m,label])=>'<tr class="border-b"><th class="text-left p-3 whitespace-nowrap">'+label+'</th>'+actions.map(([a])=>'<td class="text-center p-3"><input type="checkbox" class="h-5 w-5 accent-[#701d32]" data-module="'+m+'" data-action="'+a+'" '+(map.get(m+':'+a)?'checked':'')+' aria-label="'+label+' '+a+'"></td>').join('')+'</tr>').join('')+'</tbody></table>';
  }
  $('#add-member').addEventListener('submit',async e=>{
-  e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget).entries());
-  const {error}=await db.from('admin_users').upsert({user_id:f.user_id.trim(),role:'editor',group_id:f.group_id},{onConflict:'user_id'});
-  if(error){Swal.fire('เพิ่มสมาชิกไม่สำเร็จ',error.message,'error');return}
-  e.currentTarget.reset();await loadMembers();await loadAuthUsers();Swal.fire('สำเร็จ','เพิ่มสมาชิกในกลุ่มงานแล้ว','success');
+  e.preventDefault();
+  const form=e.currentTarget,button=$('#add-member-button'),status=$('#member-status');
+  const f=Object.fromEntries(new FormData(form).entries());
+  if(!f.user_id||!f.group_id){status.textContent='กรุณาเลือกบัญชีผู้ใช้และกลุ่มงานให้ครบถ้วน';return}
+  button.disabled=true;button.textContent='กำลังเพิ่มสมาชิก...';status.textContent='กำลังบันทึกข้อมูลสมาชิก';
+  try{
+   const {error}=await db.from('admin_users').upsert({user_id:f.user_id,role:'editor',group_id:f.group_id},{onConflict:'user_id'});
+   if(error)throw error;
+   form.reset();await loadMembers();await loadAuthUsers();
+   status.textContent='เพิ่มสมาชิกเรียบร้อยแล้ว';
+   await Swal.fire('เพิ่มสมาชิกสำเร็จ','บัญชีนี้ได้รับสิทธิ์ผู้ดูแลในกลุ่มงานที่เลือกแล้ว','success');
+  }catch(error){
+   status.textContent='เพิ่มสมาชิกไม่สำเร็จ: '+(error.message||'เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ');
+   await Swal.fire('เพิ่มสมาชิกไม่สำเร็จ',error.message||String(error),'error');
+  }finally{
+   button.disabled=false;button.textContent='เพิ่มสมาชิก';
+  }
  });
  $('#members').addEventListener('change',async e=>{
   const s=e.target.closest('[data-member-group]');if(!s)return;
