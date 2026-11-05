@@ -6,6 +6,7 @@
 const DEFAULT_DRIVE_FOLDER_ID = '1ptff4TPbIh9hlCwss4Fxg-lVpZfI33j8';
 const SUPABASE_URL = 'https://uwebbofczidcfnjbvsqu.supabase.co';
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const SCHOOL_SITE_ORIGIN = 'https://anubancs.github.io';
 const IMAGE_TYPES = ['image/jpeg','image/png','image/webp','image/gif'];
 
 function doGet(e) {
@@ -23,7 +24,7 @@ function doGet(e) {
 function doPost(e) {
   const p = e && e.parameter || {};
   try {
-    if (p.action === 'upload') return uploadImage_(p);
+    if (p.action === 'upload') {\n      const requestId = String(p.request_id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);\n      try { return uploadResponse_(requestId, uploadImage_(p)); }\n      catch (uploadError) { return uploadResponse_(requestId, {ok:false,error:String(uploadError && uploadError.message || uploadError)}); }\n    }
     if (p.action === 'notify') return notify_(p);
     return json_({ok:false,error:'Unsupported action'});
   } catch (err) {
@@ -101,3 +102,10 @@ function sendTelegram_(message) {
 }
 function safe_(v,n) { return String(v||'').replace(/[<>]/g,'').trim().slice(0,n); }
 function json_(v) { return ContentService.createTextOutput(JSON.stringify(v)).setMimeType(ContentService.MimeType.JSON); }
+
+function uploadResponse_(requestId, result) {
+  const payload = JSON.stringify({type:'school-drive-upload',requestId:requestId,result:result}).replace(/</g,'\\\\u003c');
+  const html = '<!doctype html><html><body><script>window.top.postMessage(' + payload + ',' +
+    JSON.stringify(SCHOOL_SITE_ORIGIN) + ');</script>อัปโหลดเสร็จแล้ว</body></html>';
+  return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
