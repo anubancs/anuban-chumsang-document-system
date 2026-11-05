@@ -150,10 +150,18 @@ create index if not exists admin_users_group_id_idx on public.admin_users(group_
 
 -- Owner-only directory for assigning existing Supabase Auth accounts to admin groups.
 -- The SECURITY DEFINER implementation stays in the non-exposed private schema.
-create or replace function private.list_auth_users_for_owner()
-returns table (user_id uuid,email text,created_at timestamptz,last_sign_in_at timestamptz)
+-- Return names and job positions from Supabase Auth user metadata as well as email.
+-- Drop first because PostgreSQL cannot change a RETURNS TABLE row type with CREATE OR REPLACE.
+drop function if exists public.list_auth_users_for_owner();
+drop function if exists private.list_auth_users_for_owner();
+
+create function private.list_auth_users_for_owner()
+returns table (
+ user_id uuid, full_name text, "position" text, email text,
+ created_at timestamptz, last_sign_in_at timestamptz
+)
 language plpgsql stable security definer set search_path=''
-as $$
+as $
 begin
  if auth.uid() is null or not exists (
    select 1 from public.admin_users au where au.user_id=auth.uid() and au.role='owner'
@@ -161,20 +169,26 @@ begin
    raise exception 'owner access required' using errcode='42501';
  end if;
  return query
- select u.id,u.email::text,u.created_at,u.last_sign_in_at
+ select u.id,
+   nullif(trim(coalesce(u.raw_user_meta_data->>'full_name',u.raw_user_meta_data->>'name','')),''),
+   nullif(trim(coalesce(u.raw_user_meta_data->>'position','')),''),
+   u.email::text,u.created_at,u.last_sign_in_at
  from auth.users u
  where u.deleted_at is null and coalesce(u.is_anonymous,false)=false
- order by lower(coalesce(u.email,'')),u.created_at;
+ order by lower(coalesce(u.raw_user_meta_data->>'full_name',u.email,'')),u.created_at;
 end;
-$$;
+$;
 revoke all on function private.list_auth_users_for_owner() from public,anon;
 grant usage on schema private to authenticated;
 grant execute on function private.list_auth_users_for_owner() to authenticated;
 
 -- Public RPC wrapper is SECURITY INVOKER; the private function enforces Owner access.
-create or replace function public.list_auth_users_for_owner()
-returns table (user_id uuid,email text,created_at timestamptz,last_sign_in_at timestamptz)
+create function public.list_auth_users_for_owner()
+returns table (
+ user_id uuid, full_name text, "position" text, email text,
+ created_at timestamptz, last_sign_in_at timestamptz
+)
 language sql stable security invoker set search_path=''
-as $$ select * from private.list_auth_users_for_owner(); $$;
+as $ select * from private.list_auth_users_for_owner(); $;
 revoke all on function public.list_auth_users_for_owner() from public,anon;
 grant execute on function public.list_auth_users_for_owner() to authenticated;
