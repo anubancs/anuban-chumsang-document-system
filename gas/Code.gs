@@ -119,7 +119,7 @@ function json_(v) { return ContentService.createTextOutput(JSON.stringify(v)).se
 
 function uploadResponse_(requestId, result) {
   const payload = JSON.stringify({type:'school-drive-upload',requestId:requestId,result:result}).replace(/</g,'\\u003c');
-  const html = '<!doctype html><html><body><script>window.top.postMessage(' + payload + ',' +
+  const html = '<!doctype html><html><body><script>window.parent.postMessage(' + payload + ',' +
     JSON.stringify(SCHOOL_SITE_ORIGIN) + ');</script>อัปโหลดเสร็จแล้ว</body></html>';
   return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
