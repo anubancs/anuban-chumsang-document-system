@@ -1,6 +1,115 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Admin Dashboard</title><script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><link rel="stylesheet" href="../assets/css/style.css"></head><body><header class="brand-gradient text-white p-5"><div class="max-w-7xl mx-auto flex justify-between"><b>School CMS · Dashboard</b><button id="logout">ออกจากระบบ</button></div></header><main class="max-w-7xl mx-auto p-5 md:p-10"><div class="flex flex-wrap justify-between gap-3 items-center"><div><p class="text-wine font-semibold">CONTENT MANAGEMENT</p><h1 class="text-3xl font-bold">จัดการเว็บไซต์โรงเรียน</h1></div><a href="../index.html" class="text-wine underline">ดูหน้าเว็บไซต์ ↗</a></div><section class="grid md:grid-cols-3 gap-4 my-8"><div class="glass rounded-2xl p-5"><p class="opacity-60">ข่าวทั้งหมด</p><strong id="news-count" class="text-3xl">—</strong></div><div class="glass rounded-2xl p-5"><p class="opacity-60">บุคลากร</p><strong id="staff-count" class="text-3xl">—</strong></div><div class="glass rounded-2xl p-5"><p class="opacity-60">เอกสารดาวน์โหลด</p><strong id="file-count" class="text-3xl">—</strong></div></section><section class="glass rounded-2xl p-6 mb-8"><h2 class="text-xl font-bold mb-4">เพิ่มข่าวประชาสัมพันธ์</h2><form id="news-form" class="grid md:grid-cols-2 gap-3"><input class="border rounded-xl p-3 text-black" name="title" placeholder="หัวข้อข่าว" required><input class="border rounded-xl p-3 text-black" name="slug" placeholder="slug ภาษาอังกฤษ เช่น school-activity" required><input class="border rounded-xl p-3 text-black md:col-span-2" name="cover_image_url" type="url" placeholder="URL ภาพหน้าปก (Google Drive direct image URL)"><textarea class="border rounded-xl p-3 text-black md:col-span-2" name="excerpt" placeholder="คำโปรย"></textarea><textarea class="border rounded-xl p-3 text-black md:col-span-2" name="content" rows="6" placeholder="เนื้อหาข่าว" required></textarea><button class="brand-gradient text-white rounded-xl p-3 md:col-span-2">บันทึกเป็นฉบับร่าง</button></form></section><section class="glass rounded-2xl p-6"><h2 class="text-xl font-bold mb-4">เพิ่มบุคลากร</h2><form id="staff-form" class="grid md:grid-cols-2 gap-3"><input class="border rounded-xl p-3 text-black" name="full_name" placeholder="ชื่อ-นามสกุล" required><input class="border rounded-xl p-3 text-black" name="position" placeholder="ตำแหน่ง" required><input class="border rounded-xl p-3 text-black" name="department" placeholder="กลุ่มสาระ/กลุ่มงาน"><input class="border rounded-xl p-3 text-black" name="photo_url" type="url" placeholder="URL รูปภาพ"><input class="border rounded-xl p-3 text-black md:col-span-2" name="personal_website_url" type="url" placeholder="เว็บไซต์ส่วนตัว (https://...)"><textarea class="border rounded-xl p-3 text-black md:col-span-2" name="bio" placeholder="ประวัติย่อ"></textarea><button class="brand-gradient text-white rounded-xl p-3 md:col-span-2">เพิ่มบุคลากร</button></form></section><p id="status" class="text-sm opacity-60 mt-5"></p></main><script src="../assets/js/supabase.js"></script><script>
-(async()=>{const db=schoolSupabase;const {data:{user},error}=await db.auth.getUser();if(error||!user){location.href='login.html';return}const {data:admin}=await db.from('admin_users').select('role').eq('user_id',user.id).maybeSingle();if(!admin){await db.auth.signOut();location.href='login.html';return}const count=async(t)=>{const r=await db.from(t).select('*',{count:'exact',head:true});if(r.error)throw r.error;return r.count??0};try{document.querySelector('#news-count').textContent=await count('news');document.querySelector('#staff-count').textContent=await count('personnel');document.querySelector('#file-count').textContent=await count('downloads')}catch(e){document.querySelector('#status').textContent='โหลดสถิติไม่สำเร็จ: '+e.message}
-document.querySelector('#news-form').addEventListener('submit',async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget));const {error}=await db.from('news').insert({...f,status:'draft',created_by:user.id,author_name:user.email});if(error)Swal.fire('ผิดพลาด',error.message,'error');else{Swal.fire('สำเร็จ','บันทึกข่าวฉบับร่างแล้ว','success');e.currentTarget.reset();document.querySelector('#news-count').textContent=await count('news')}});
-document.querySelector('#staff-form').addEventListener('submit',async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget));const {error}=await db.from('personnel').insert({...f,social_links:{},is_published:false});if(error)Swal.fire('ผิดพลาด',error.message,'error');else{Swal.fire('สำเร็จ','เพิ่มบุคลากรเป็นฉบับไม่เผยแพร่แล้ว','success');e.currentTarget.reset();document.querySelector('#staff-count').textContent=await count('personnel')}});
-document.querySelector('#logout').onclick=async()=>{await db.auth.signOut();location.href='login.html'};
-})();</script></body></html>
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ระบบจัดการเว็บไซต์โรงเรียน</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="../assets/css/style.css"></head>
+<body>
+<header class="brand-gradient text-white p-5"><div class="max-w-7xl mx-auto flex justify-between items-center"><b>School CMS · Dashboard</b><div class="flex gap-4"><a href="../index.html">ดูเว็บไซต์</a><button id="logout">ออกจากระบบ</button></div></div></header>
+<main class="max-w-7xl mx-auto p-5 md:p-10">
+  <div class="flex flex-wrap justify-between items-center gap-3"><div><p class="text-wine font-semibold">CONTENT MANAGEMENT</p><h1 class="text-3xl font-bold">จัดการเว็บไซต์โรงเรียน</h1><p id="whoami" class="text-sm opacity-60 mt-1"></p></div><span id="role" class="glass rounded-full px-4 py-2 text-sm"></span></div>
+  <section class="grid sm:grid-cols-3 gap-4 my-8">
+    <div class="glass rounded-2xl p-5"><p class="opacity-60">ข่าวทั้งหมด</p><strong id="news-count" class="text-3xl">—</strong></div>
+    <div class="glass rounded-2xl p-5"><p class="opacity-60">บุคลากร</p><strong id="staff-count" class="text-3xl">—</strong></div>
+    <div class="glass rounded-2xl p-5"><p class="opacity-60">เอกสารดาวน์โหลด</p><strong id="file-count" class="text-3xl">—</strong></div>
+  </section>
+  <section class="glass rounded-2xl p-6 mb-8">
+    <h2 class="text-xl font-bold mb-4">เพิ่มข่าวประชาสัมพันธ์</h2>
+    <form id="news-form" class="grid md:grid-cols-2 gap-3">
+      <input class="rounded-xl p-3 text-black" name="title" placeholder="หัวข้อข่าว" required maxlength="250">
+      <input class="rounded-xl p-3 text-black" name="slug" placeholder="slug ภาษาอังกฤษ" required pattern="[a-z0-9-]+" maxlength="250">
+      <input class="rounded-xl p-3 text-black md:col-span-2" name="cover_image_url" type="url" placeholder="URL ภาพหน้าปก (Google Drive share/direct URL)">
+      <textarea class="rounded-xl p-3 text-black md:col-span-2" name="excerpt" placeholder="คำโปรย" maxlength="500"></textarea>
+      <textarea class="rounded-xl p-3 text-black md:col-span-2" name="content" rows="6" placeholder="เนื้อหาข่าว" required></textarea>
+      <div class="flex flex-wrap gap-3 md:col-span-2"><button class="brand-gradient text-white rounded-xl px-5 py-3">บันทึกฉบับร่าง</button><button id="publish-news" type="button" class="btn-gold rounded-xl px-5 py-3">บันทึกและเผยแพร่</button></div>
+    </form>
+  </section>
+  <section class="glass rounded-2xl p-6 mb-8">
+    <div class="flex justify-between items-center gap-3"><h2 class="text-xl font-bold">จัดการข่าวประชาสัมพันธ์</h2><button id="refresh-news" class="underline text-wine">รีเฟรช</button></div>
+    <div id="news-list" class="mt-4 space-y-3">กำลังโหลด...</div>
+  </section>
+  <section class="glass rounded-2xl p-6 mb-8">
+    <h2 class="text-xl font-bold mb-4">เพิ่มบุคลากร</h2>
+    <form id="staff-form" class="grid md:grid-cols-2 gap-3">
+      <input class="rounded-xl p-3 text-black" name="full_name" placeholder="ชื่อ-นามสกุล" required maxlength="200">
+      <input class="rounded-xl p-3 text-black" name="position" placeholder="ตำแหน่ง" required maxlength="200">
+      <input class="rounded-xl p-3 text-black" name="department" placeholder="กลุ่มสาระ/กลุ่มงาน">
+      <input class="rounded-xl p-3 text-black" name="photo_url" type="url" placeholder="URL รูปภาพ">
+      <input class="rounded-xl p-3 text-black md:col-span-2" name="personal_website_url" type="url" placeholder="เว็บไซต์ส่วนตัว (https://...)">
+      <textarea class="rounded-xl p-3 text-black md:col-span-2" name="bio" rows="3" placeholder="ประวัติย่อ"></textarea>
+      <button class="brand-gradient text-white rounded-xl p-3 md:col-span-2">เพิ่มบุคลากร (ยังไม่เผยแพร่)</button>
+    </form>
+  </section>
+  <section class="glass rounded-2xl p-6">
+    <div class="flex justify-between items-center gap-3"><h2 class="text-xl font-bold">จัดการบุคลากร</h2><button id="refresh-staff" class="underline text-wine">รีเฟรช</button></div>
+    <div id="staff-list" class="mt-4 space-y-3">กำลังโหลด...</div>
+  </section>
+  <p id="status" role="status" class="text-sm opacity-60 mt-5"></p>
+</main>
+<script src="../assets/js/supabase.js"></script>
+<script>
+(async()=>{
+  const db=schoolSupabase, $=s=>document.querySelector(s);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const {data:{user},error:authError}=await db.auth.getUser();
+  if(authError||!user){location.href='login.html';return}
+  const {data:admin,error:adminError}=await db.from('admin_users').select('role').eq('user_id',user.id).maybeSingle();
+  if(adminError||!admin){await db.auth.signOut();location.href='login.html';return}
+  $('#whoami').textContent=user.email||'บัญชีผู้ดูแล';$('#role').textContent='สิทธิ์: '+admin.role;
+  const count=async t=>{const r=await db.from(t).select('*',{count:'exact',head:true});if(r.error)throw r.error;return r.count??0};
+  async function stats(){try{$('#news-count').textContent=await count('news');$('#staff-count').textContent=await count('personnel');$('#file-count').textContent=await count('downloads')}catch(e){$('#status').textContent='โหลดสถิติไม่สำเร็จ: '+e.message}}
+  async function loadNews(){
+    const root=$('#news-list');root.textContent='กำลังโหลด...';
+    const {data,error}=await db.from('news').select('id,title,slug,status,published_at,created_at').order('created_at',{ascending:false}).limit(100);
+    if(error){root.textContent='โหลดข่าวไม่สำเร็จ: '+error.message;return}
+    root.innerHTML=(data||[]).map(n=>`<article class="border rounded-xl p-4 flex flex-wrap justify-between gap-3 items-center"><div><b>${esc(n.title)}</b><p class="text-sm opacity-60">${esc(n.slug)} · ${esc(n.status)} · ${n.published_at?new Date(n.published_at).toLocaleString('th-TH'):'ยังไม่เผยแพร่'}</p></div><div class="flex flex-wrap gap-2"><button class="text-wine underline" data-edit-news="${n.id}">แก้ไข</button><button class="text-wine underline" data-toggle-news="${n.id}" data-status="${n.status}">${n.status==='published'?'ถอนเผยแพร่':'เผยแพร่'}</button><button class="text-red-700 underline" data-delete-news="${n.id}">ลบ</button></div></article>`).join('')||'<p class="opacity-60">ยังไม่มีข่าว</p>';
+  }
+  async function loadStaff(){
+    const root=$('#staff-list');root.textContent='กำลังโหลด...';
+    const {data,error}=await db.from('personnel').select('id,full_name,position,department,is_published,personal_website_url').order('sort_order').order('full_name').limit(200);
+    if(error){root.textContent='โหลดบุคลากรไม่สำเร็จ: '+error.message;return}
+    root.innerHTML=(data||[]).map(p=>`<article class="border rounded-xl p-4 flex flex-wrap justify-between gap-3 items-center"><div><b>${esc(p.full_name)}</b><p class="text-sm opacity-60">${esc(p.position)} · ${esc(p.department||'ไม่ระบุกลุ่มงาน')} · ${p.is_published?'เผยแพร่':'ฉบับร่าง'}</p>${p.personal_website_url?'<span class="text-xs underline">มีเว็บไซต์ส่วนตัว</span>':''}</div><div class="flex flex-wrap gap-2"><button class="text-wine underline" data-edit-staff="${p.id}">แก้ไข</button><button class="text-wine underline" data-toggle-staff="${p.id}" data-published="${p.is_published}">${p.is_published?'ซ่อน':'เผยแพร่'}</button><button class="text-red-700 underline" data-delete-staff="${p.id}">ลบ</button></div></article>`).join('')||'<p class="opacity-60">ยังไม่มีข้อมูลบุคลากร</p>';
+  }
+  async function saveNews(publish){
+    const f=Object.fromEntries(new FormData($('#news-form')).entries());
+    const payload={...f,status:publish?'published':'draft',published_at:publish?new Date().toISOString():null,created_by:user.id,author_name:user.email};
+    const {error}=await db.from('news').insert(payload);
+    if(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');return}
+    $('#news-form').reset();await Promise.all([stats(),loadNews()]);Swal.fire('สำเร็จ',publish?'ข่าวเผยแพร่แล้ว':'บันทึกเป็นฉบับร่างแล้ว','success');
+  }
+  $('#news-form').addEventListener('submit',e=>{e.preventDefault();saveNews(false)});
+  $('#publish-news').addEventListener('click',()=>{if($('#news-form').reportValidity())saveNews(true)});
+  $('#staff-form').addEventListener('submit',async e=>{
+    e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget).entries());
+    const {error}=await db.from('personnel').insert({...f,social_links:{},is_published:false});
+    if(error){Swal.fire('เพิ่มไม่สำเร็จ',error.message,'error');return}
+    e.currentTarget.reset();await Promise.all([stats(),loadStaff()]);Swal.fire('สำเร็จ','เพิ่มบุคลากรเป็นฉบับร่างแล้ว','success');
+  });
+  $('#news-list').addEventListener('click',async e=>{
+    const edit=e.target.closest('[data-edit-news]'),toggle=e.target.closest('[data-toggle-news]'),del=e.target.closest('[data-delete-news]');
+    if(edit){
+      const id=edit.dataset.editNews;const {data,error}=await db.from('news').select('*').eq('id',id).single();if(error)return Swal.fire('ผิดพลาด',error.message,'error');
+      const fields=[['title','หัวข้อ',data.title],['slug','Slug',data.slug],['excerpt','คำโปรย',data.excerpt||''],['cover_image_url','URL ภาพ',data.cover_image_url||''],['content','เนื้อหา',data.content]];
+      const html=fields.map(([n,l,v])=>`<label class="block text-left text-sm mt-2">${l}</label><textarea id="swal-${n}" class="swal2-textarea" style="width:100%;margin:4px 0">${esc(v)}</textarea>`).join('');
+      const result=await Swal.fire({title:'แก้ไขข่าว',html,showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>Object.fromEntries(fields.map(([n])=>[n,document.querySelector('#swal-'+n).value]))});
+      if(result.isConfirmed){const {error:uerr}=await db.from('news').update(result.value).eq('id',id);if(uerr)Swal.fire('ผิดพลาด',uerr.message,'error');else{await loadNews();Swal.fire('บันทึกแล้ว','','success')}}
+    }
+    if(toggle){const publish=toggle.dataset.status!=='published';const {error}=await db.from('news').update({status:publish?'published':'draft',published_at:publish?new Date().toISOString():null}).eq('id',toggle.dataset.toggleNews);if(error)Swal.fire('ผิดพลาด',error.message,'error');else{await loadNews();await stats()}}
+    if(del&& (await Swal.fire({title:'ยืนยันลบข่าว?',icon:'warning',showCancelButton:true,confirmButtonText:'ลบ'})).isConfirmed){const {error}=await db.from('news').delete().eq('id',del.dataset.deleteNews);if(error)Swal.fire('ลบไม่สำเร็จ',error.message,'error');else{await loadNews();await stats()}}
+  });
+  $('#staff-list').addEventListener('click',async e=>{
+    const edit=e.target.closest('[data-edit-staff]'),toggle=e.target.closest('[data-toggle-staff]'),del=e.target.closest('[data-delete-staff]');
+    if(edit){
+      const id=edit.dataset.editStaff;const {data,error}=await db.from('personnel').select('*').eq('id',id).single();if(error)return Swal.fire('ผิดพลาด',error.message,'error');
+      const fields=[['full_name','ชื่อ-นามสกุล',data.full_name],['position','ตำแหน่ง',data.position],['department','กลุ่มงาน',data.department||''],['photo_url','URL รูป',data.photo_url||''],['personal_website_url','เว็บไซต์ส่วนตัว',data.personal_website_url||''],['bio','ประวัติ',data.bio||'']];
+      const html=fields.map(([n,l,v])=>`<label class="block text-left text-sm mt-2">${l}</label><textarea id="swal-${n}" class="swal2-textarea" style="width:100%;margin:4px 0">${esc(v)}</textarea>`).join('');
+      const result=await Swal.fire({title:'แก้ไขข้อมูลบุคลากร',html,showCancelButton:true,confirmButtonText:'บันทึก',preConfirm:()=>Object.fromEntries(fields.map(([n])=>[n,document.querySelector('#swal-'+n).value]))});
+      if(result.isConfirmed){const {error:uerr}=await db.from('personnel').update(result.value).eq('id',id);if(uerr)Swal.fire('ผิดพลาด',uerr.message,'error');else{await loadStaff();Swal.fire('บันทึกแล้ว','','success')}}
+    }
+    if(toggle){const publish=toggle.dataset.published!=='true';const {error}=await db.from('personnel').update({is_published:publish}).eq('id',toggle.dataset.toggleStaff);if(error)Swal.fire('ผิดพลาด',error.message,'error');else{await loadStaff();await stats()}}
+    if(del&&(await Swal.fire({title:'ยืนยันลบบุคลากร?',icon:'warning',showCancelButton:true,confirmButtonText:'ลบ'})).isConfirmed){const {error}=await db.from('personnel').delete().eq('id',del.dataset.deleteStaff);if(error)Swal.fire('ลบไม่สำเร็จ',error.message,'error');else{await loadStaff();await stats()}}
+  });
+  $('#refresh-news').onclick=loadNews;$('#refresh-staff').onclick=loadStaff;
+  $('#logout').onclick=async()=>{await db.auth.signOut();location.href='login.html'};
+  await Promise.all([stats(),loadNews(),loadStaff()]);
+})();
+</script></body></html>
