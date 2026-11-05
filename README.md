@@ -67,13 +67,11 @@ on conflict (user_id) do update set role = excluded.role;
 
 ### GitHub Pages
 
-Repository นี้เป็น **Private** อยู่ในขณะนี้ การใช้ GitHub Pages ฟรีกับ Private Repository ขึ้นกับแผน GitHub ที่บัญชีมี หากเป็น GitHub Free จะต้องใช้ Repository สาธารณะจึงจะใช้ Pages ฟรีได้ อย่าเปลี่ยน Repository เป็น Public โดยไม่ได้รับอนุญาต
+Repository นี้เป็น **Public** และใช้ชื่อ `anubancs.github.io` ซึ่งเป็นรูปแบบ User/Organization Site ของ GitHub Pages
 
-หากบัญชีมีสิทธิ์ Pages:
-1. GitHub Repository → Settings → Pages
-2. เลือก Deploy from a branch
-3. เลือก Branch `main` และ Folder `/ (root)`
-4. Save และรอ URL ที่ GitHub แจ้ง
+URL เป้าหมาย: **https://anubancs.github.io/**
+
+การตั้งค่า Pages: GitHub Repository → Settings → Pages → Deploy from a branch → Branch `main` และ Folder `/ (root)` จากนั้น Save และรอ GitHub Pages build/deployment สำเร็จ
 
 ### Vercel
 
