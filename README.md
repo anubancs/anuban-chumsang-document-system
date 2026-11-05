@@ -37,7 +37,7 @@ values ('AUTH_USER_UUID', 'owner')
 on conflict (user_id) do update set role = excluded.role;
 ```
 
-5. ตั้งค่า Auth Site URL และ Redirect URLs ให้ตรงกับ URL ที่ Deploy จริง
+5. ตั้งค่า Authentication → URL Configuration:\n   - Site URL: `https://anubancs.github.io`\n   - Redirect URL: `https://anubancs.github.io/admin/login.html`\n   - เพิ่ม `https://anubancs.github.io/**` เฉพาะเมื่อจำเป็นสำหรับหน้าอื่น\n6. สำหรับ Owner ที่มีบัญชีอยู่แล้ว ให้เปิดหน้า `https://anubancs.github.io/admin/login.html` กรอกอีเมล แล้วกด “ลืมรหัสผ่าน / ตั้งรหัสผ่านครั้งแรก” เพื่อรับอีเมลกำหนดรหัสผ่าน จากนั้นเปิดลิงก์และตั้งรหัสผ่านใหม่
 
 ไฟล์ `supabase/schema.sql` เป็น SQL สำหรับอ้างอิง/ติดตั้งบนโปรเจกต์ใหม่ที่สะอาด ไม่ควรรันซ้ำบนโปรเจกต์ที่มี Migration ติดตั้งแล้ว
 
@@ -85,7 +85,7 @@ URL เป้าหมาย: **https://anubancs.github.io/**
 
 - ทดสอบอ่านข้อมูลด้วยผู้เยี่ยมชมที่ยังไม่ Login
 - ทดสอบ Login ด้วยบัญชี Admin และบัญชีที่ไม่มีสิทธิ์
-- ทดสอบเพิ่ม/แก้ไข/ลบข้อมูลแต่ละโมดูล
+- ทดสอบเพิ่ม/แก้ไข/ลบข้อมูลแต่ละโมดูล\n- ทดสอบกล่องข้อความผู้ดูแลที่ `admin/messages.html`
 - ทดสอบฟอร์มติดต่อและ Telegram
 - ทดสอบ URL/สิทธิ์แชร์ไฟล์ Google Drive จาก Browser ที่ไม่ Login
 - ทดสอบ Mobile, SEO metadata, keyboard accessibility และ Dark Mode
