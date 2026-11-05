@@ -20,3 +20,5 @@ jobs:
           node --check --input-type=commonjs < gas/Code.gs
       - name: Check inline scripts in HTML
         run: node scripts/check-inline-js.mjs
+      - name: Check local site links and required files
+        run: node scripts/check-site.mjs
