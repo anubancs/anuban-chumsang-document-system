@@ -1,6 +1,6 @@
 /** Public data access and safe contact submission. */
 (() => {
-  const db = () => window.schoolSupabase;
+  const db = () => window.schoolSupabase;\n  // Paste the deployed Apps Script Web App URL here (ends in /exec).\n  window.SCHOOL_GAS_WEB_APP_URL = window.SCHOOL_GAS_WEB_APP_URL || '';
   const ui = () => window.schoolUI;
   window.schoolAPI = {
     async latestNews(limit = 4) {
