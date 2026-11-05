@@ -44,7 +44,7 @@ function uploadImage_(p) {
   const ext = mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1];
   const filename = Utilities.formatDate(new Date(),'Asia/Bangkok','yyyyMMdd_HHmmss') + '_' +
     Utilities.getUuid().slice(0,8) + '_' + original.replace(/\.[^.]+$/,'') + '.' + ext;
-  const root = DriveApp.getFolderById(driveFolderId_);
+  const root = DriveApp.getFolderById(driveFolderId_());
   const folder = getOrCreateFolder_(root,category);
   const file = folder.createFile(Utilities.newBlob(bytes,mime,filename));
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);
