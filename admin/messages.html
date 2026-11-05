@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>กล่องข้อความติดต่อโรงเรียน</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+<header class="brand-gradient text-white p-5">
+  <div class="max-w-7xl mx-auto flex flex-wrap justify-between gap-3 items-center">
+    <b>School CMS · Contact Inbox</b>
+    <nav class="flex flex-wrap gap-4"><a href="dashboard.html">Dashboard</a><a href="library.html">เอกสารและกิจกรรม</a><a href="../index.html">เว็บไซต์</a><button id="logout">ออกจากระบบ</button></nav>
+  </div>
+</header>
+<main class="max-w-7xl mx-auto p-5 md:p-10">
+  <div class="flex flex-wrap justify-between gap-3 items-center">
+    <div><p class="text-wine font-semibold">CONTACT MESSAGES</p><h1 class="text-3xl font-bold">กล่องข้อความติดต่อโรงเรียน</h1><p id="user" class="text-sm opacity-60 mt-2"></p></div>
+    <button id="refresh" class="underline text-wine">รีเฟรช</button>
+  </div>
+  <section class="grid sm:grid-cols-3 gap-4 my-8">
+    <div class="glass rounded-2xl p-5"><p class="opacity-60">ข้อความทั้งหมด</p><strong id="total" class="text-3xl">—</strong></div>
+    <div class="glass rounded-2xl p-5"><p class="opacity-60">ยังไม่อ่าน</p><strong id="unread" class="text-3xl">—</strong></div>
+    <div class="glass rounded-2xl p-5"><p class="opacity-60">ปิดเรื่องแล้ว</p><strong id="closed" class="text-3xl">—</strong></div>
+  </section>
+  <div class="flex flex-wrap gap-3 items-center mb-5">
+    <label for="filter" class="font-semibold">แสดงสถานะ</label>
+    <select id="filter" class="rounded-xl border p-3 text-black"><option value="all">ทั้งหมด</option><option value="new">ยังไม่อ่าน</option><option value="read">อ่านแล้ว</option><option value="replied">ตอบกลับแล้ว</option><option value="closed">ปิดเรื่องแล้ว</option></select>
+  </div>
+  <div id="messages" class="space-y-4"><p>กำลังโหลดข้อความ...</p></div>
+  <p id="status" class="text-sm opacity-60 mt-5" role="status"></p>
+</main>
+<script src="../assets/js/supabase.js"></script>
+<script>
+(async()=>{
+  const db=schoolSupabase,$=s=>document.querySelector(s);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const {data:{user},error:authError}=await db.auth.getUser();
+  if(authError||!user){location.replace('login.html');return}
+  const {data:admin,error:adminError}=await db.from('admin_users').select('role').eq('user_id',user.id).maybeSingle();
+  if(adminError||!admin){await db.auth.signOut();location.replace('login.html');return}
+  $('#user').textContent=(user.email||'ผู้ดูแล')+' · '+admin.role;
+
+  let messages=[];
+  async function load(){
+    $('#messages').textContent='กำลังโหลดข้อความ...';
+    const {data,error}=await db.from('contact_messages').select('id,sender_name,sender_email,subject,message,status,created_at').order('created_at',{ascending:false}).limit(200);
+    if(error){$('#messages').textContent='โหลดข้อความไม่สำเร็จ: '+error.message;$('#status').textContent='ตรวจสอบสิทธิ์ตาราง contact_messages และ RLS';return}
+    messages=data||[];
+    $('#total').textContent=messages.length;
+    $('#unread').textContent=messages.filter(m=>m.status==='new').length;
+    $('#closed').textContent=messages.filter(m=>m.status==='closed').length;
+    render();
+  }
+  function render(){
+    const filter=$('#filter').value;
+    const rows=filter==='all'?messages:messages.filter(m=>m.status===filter);
+    $('#messages').innerHTML=rows.map(m=>`<article class="glass rounded-2xl p-5">
+      <div class="flex flex-wrap justify-between gap-3">
+        <div><h2 class="font-bold text-lg">${esc(m.subject||'ไม่มีหัวข้อ')}</h2><p class="text-sm opacity-70">${esc(m.sender_name)} · ${esc(m.sender_email||'ไม่ระบุอีเมล')} · ${new Date(m.created_at).toLocaleString('th-TH')}</p></div>
+        <span class="rounded-full border px-3 py-1 text-sm">${({new:'ยังไม่อ่าน',read:'อ่านแล้ว',replied:'ตอบกลับแล้ว',closed:'ปิดเรื่องแล้ว'})[m.status]||esc(m.status)}</span>
+      </div>
+      <p class="whitespace-pre-wrap break-words my-4">${esc(m.message)}</p>
+      <div class="flex flex-wrap gap-3 items-center">
+        <label class="text-sm" for="status-${m.id}">เปลี่ยนสถานะ</label>
+        <select id="status-${m.id}" class="rounded-lg border p-2 text-black" data-status-id="${m.id}">
+          ${[['new','ยังไม่อ่าน'],['read','อ่านแล้ว'],['replied','ตอบกลับแล้ว'],['closed','ปิดเรื่องแล้ว']].map(([v,l])=>`<option value="${v}" ${m.status===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        ${m.sender_email?`<a class="underline text-wine" href="mailto:${encodeURIComponent(m.sender_email)}">ตอบกลับทางอีเมล</a>`:''}
+        <button class="underline text-red-700" data-delete-id="${m.id}">ลบข้อความ</button>
+      </div>
+    </article>`).join('')||'<p class="opacity-60">ไม่มีข้อความในสถานะนี้</p>';
+  }
+  $('#messages').addEventListener('change',async e=>{
+    const select=e.target.closest('[data-status-id]');if(!select)return;
+    const {error}=await db.from('contact_messages').update({status:select.value}).eq('id',select.dataset.statusId);
+    if(error){Swal.fire('เปลี่ยนสถานะไม่สำเร็จ',error.message,'error');return}
+    const item=messages.find(m=>m.id===select.dataset.statusId);if(item)item.status=select.value;
+    $('#total').textContent=messages.length;$('#unread').textContent=messages.filter(m=>m.status==='new').length;$('#closed').textContent=messages.filter(m=>m.status==='closed').length;render();
+  });
+  $('#messages').addEventListener('click',async e=>{
+    const button=e.target.closest('[data-delete-id]');if(!button)return;
+    const result=await Swal.fire({title:'ยืนยันลบข้อความนี้?',text:'การลบไม่สามารถเรียกคืนได้',icon:'warning',showCancelButton:true,confirmButtonText:'ลบข้อความ',cancelButtonText:'ยกเลิก'});
+    if(!result.isConfirmed)return;
+    const {error}=await db.from('contact_messages').delete().eq('id',button.dataset.deleteId);
+    if(error){Swal.fire('ลบไม่สำเร็จ',error.message,'error');return}
+    await load();
+  });
+  $('#filter').addEventListener('change',render);
+  $('#refresh').addEventListener('click',load);
+  $('#logout').addEventListener('click',async()=>{await db.auth.signOut();location.replace('login.html')});
+  await load();
+})().catch(error=>{document.querySelector('#status').textContent='เกิดข้อผิดพลาด: '+error.message});
+</script>
+</body></html>
