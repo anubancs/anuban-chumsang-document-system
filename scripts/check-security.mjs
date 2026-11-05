@@ -36,7 +36,7 @@ for (const file of files.filter(file => file !== 'scripts/check-security.mjs')) 
 const adminPages = files.filter(file => file.startsWith(`admin${path.sep}`) && file.endsWith('.html'));
 for (const file of adminPages) {
   const source = fs.readFileSync(file, 'utf8');
-  if (!/auth\.getUser\s*\(/.test(source) || !/from\(['"]admin_users['"]\)/.test(source)) {
+  const hasSessionCheck = file === path.join('admin', 'login.html')\n    ? /signInWithPassword\s*\(/.test(source)\n    : /auth\\.getUser\\s*\\(/.test(source);\n  if (!hasSessionCheck || !/from\\(['\"]admin_users['\"]\\)/.test(source)) {
     failed = true;
     console.error(`Admin page is missing the client-side session and admin-membership guard: ${file}`);
   }
