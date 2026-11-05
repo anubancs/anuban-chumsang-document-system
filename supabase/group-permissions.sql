@@ -110,6 +110,18 @@ join (values ('public-relations','news'),('public-relations','galleries'),('publ
 cross join (values ('view'),('create'),('update'),('delete'),('publish')) a(action)
 on conflict (group_id,module,action) do nothing;
 
+-- Lock down any legacy broad grants; each group may manage only its intended modules.
+update public.group_permissions gp
+set allowed = case g.slug
+  when 'public-relations' then gp.module in ('news','galleries','events')
+  when 'human-resources' then gp.module in ('personnel')
+  when 'student-affairs' then gp.module in ('events','galleries','downloads','class_overview')
+  else false
+end
+from public.admin_groups g
+where gp.group_id=g.id
+  and g.slug in ('public-relations','human-resources','student-affairs');
+
 create or replace function private.guard_publish_permission()
 returns trigger language plpgsql set search_path=''
 as $$
