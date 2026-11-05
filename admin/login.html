@@ -1,1 +1,83 @@
-<!doctype html><html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>เข้าสู่ระบบผู้ดูแล</title><script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><link rel="stylesheet" href="../assets/css/style.css"></head><body class="min-h-screen grid place-items-center p-5"><form id="login" class="glass rounded-3xl p-8 w-full max-w-md"><h1 class="text-2xl font-bold">ระบบผู้ดูแลเว็บไซต์</h1><p class="opacity-70 mt-2 mb-6">เข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ผู้ดูแล</p><label class="block text-sm mb-2">อีเมล</label><input class="w-full rounded-xl border p-3 mb-4 text-black" type="email" name="email" required><label class="block text-sm mb-2">รหัสผ่าน</label><input class="w-full rounded-xl border p-3 mb-6 text-black" type="password" name="password" required><button class="brand-gradient text-white rounded-xl p-3 w-full font-semibold">เข้าสู่ระบบ</button><a class="block text-center mt-5 text-wine" href="../index.html">กลับหน้าเว็บไซต์</a></form><script src="../assets/js/supabase.js"></script><script>document.querySelector('#login').addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.currentTarget);const {data,error}=await schoolSupabase.auth.signInWithPassword({email:f.get('email'),password:f.get('password')});if(error){Swal.fire('เข้าสู่ระบบไม่สำเร็จ',error.message,'error');return}const {data:admin,error:checkError}=await schoolSupabase.from('admin_users').select('role').eq('user_id',data.user.id).maybeSingle();if(checkError||!admin){await schoolSupabase.auth.signOut();Swal.fire('ไม่มีสิทธิ์','บัญชีนี้ยังไม่ได้รับสิทธิ์ผู้ดูแลเว็บไซต์','warning');return}location.href='dashboard.html'});</script></body></html>
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>เข้าสู่ระบบผู้ดูแล</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body class="min-h-screen grid place-items-center p-5">
+<form id="login" class="glass rounded-3xl p-8 w-full max-w-md">
+<h1 class="text-2xl font-bold">ระบบผู้ดูแลเว็บไซต์</h1>
+<p class="opacity-70 mt-2 mb-6">เข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ผู้ดูแล</p>
+<label class="block text-sm mb-2" for="email">อีเมล</label>
+<input id="email" class="w-full rounded-xl border p-3 mb-4 text-black" type="email" name="email" autocomplete="username" required>
+<label class="block text-sm mb-2" for="password">รหัสผ่าน</label>
+<input id="password" class="w-full rounded-xl border p-3 mb-3 text-black" type="password" name="password" autocomplete="current-password" required>
+<button id="submit" class="brand-gradient text-white rounded-xl p-3 w-full font-semibold">เข้าสู่ระบบ</button>
+<button id="forgot" type="button" class="block text-center mt-4 w-full underline text-wine">ลืมรหัสผ่าน / ตั้งรหัสผ่านครั้งแรก</button>
+<a class="block text-center mt-5" href="../index.html">กลับหน้าเว็บไซต์</a>
+</form>
+<script src="../assets/js/supabase.js"></script>
+<script>
+(() => {
+  const form = document.querySelector('#login');
+  const emailInput = document.querySelector('#email');
+  const passwordInput = document.querySelector('#password');
+  const submit = document.querySelector('#submit');
+  const db = window.schoolSupabase;
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    submit.disabled = true;
+    submit.textContent = 'กำลังตรวจสอบ...';
+    try {
+      const { data, error } = await db.auth.signInWithPassword({
+        email: emailInput.value.trim(),
+        password: passwordInput.value
+      });
+      if (error) throw error;
+      const { data: admin, error: membershipError } = await db
+        .from('admin_users').select('role').eq('user_id', data.user.id).maybeSingle();
+      if (membershipError || !admin) {
+        await db.auth.signOut();
+        throw new Error('บัญชีนี้ยังไม่ได้รับสิทธิ์ผู้ดูแลเว็บไซต์');
+      }
+      location.replace('dashboard.html');
+    } catch (error) {
+      Swal.fire('เข้าสู่ระบบไม่สำเร็จ', error.message || 'กรุณาตรวจสอบอีเมลและรหัสผ่าน', 'error');
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'เข้าสู่ระบบ';
+    }
+  });
+
+  document.querySelector('#forgot').addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    if (!email || !emailInput.checkValidity()) {
+      await Swal.fire('กรุณากรอกอีเมล', 'ระบุอีเมลบัญชีที่ต้องการตั้งหรือรีเซ็ตรหัสผ่านก่อน', 'info');
+      emailInput.focus();
+      return;
+    }
+    const result = await Swal.fire({
+      title: 'ส่งลิงก์ตั้งรหัสผ่าน',
+      text: 'ระบบจะส่งอีเมลสำหรับตั้งรหัสผ่านไปยังบัญชีนี้ หากบัญชีมีอยู่ในระบบ',
+      icon: 'question', showCancelButton: true,
+      confirmButtonText: 'ส่งอีเมล', cancelButtonText: 'ยกเลิก'
+    });
+    if (!result.isConfirmed) return;
+    try {
+      const { error } = await db.auth.resetPasswordForEmail(email, {
+        redirectTo: location.origin + '/admin/set-password.html'
+      });
+      if (error) throw error;
+      await Swal.fire('ส่งคำขอแล้ว', 'หากอีเมลนี้ลงทะเบียนไว้ ระบบจะส่งลิงก์ตั้งรหัสผ่าน กรุณาตรวจสอบกล่องจดหมายและ Spam', 'success');
+    } catch (error) {
+      Swal.fire('ส่งอีเมลไม่สำเร็จ', error.message, 'error');
+    }
+  });
+})();
+</script>
+</body></html>
