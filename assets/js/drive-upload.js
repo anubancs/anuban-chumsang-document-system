@@ -30,7 +30,12 @@
       const cleanup=()=>{window.removeEventListener('message',onMessage);form.remove();frame.remove();clearTimeout(timer)};
       const finish=(fn,value)=>{if(settled)return;settled=true;cleanup();fn(value)};
       const onMessage=event=>{
-        if(!['https://script.google.com','https://script.googleusercontent.com'].includes(event.origin))return;
+        let trustedOrigin=false;
+        try {
+          const host=new URL(event.origin).hostname;
+          trustedOrigin=host==='script.google.com'||host==='googleusercontent.com'||host.endsWith('.googleusercontent.com');
+        } catch {}
+        if(!trustedOrigin)return;
         const msg=event.data;
         if(!msg||msg.type!=='school-drive-upload'||msg.requestId!==requestId)return;
         if(msg.result?.ok&&msg.result.url)finish(resolve,msg.result);
