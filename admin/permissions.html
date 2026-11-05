@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>กำหนดสิทธิ์การใช้งาน · School CMS</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<link rel="stylesheet" href="../assets/css/style.css"></head>
+<body>
+<header class="brand-gradient text-white p-5"><div class="max-w-7xl mx-auto flex flex-wrap justify-between gap-3 items-center"><b>School CMS · Access Control</b><nav class="flex flex-wrap gap-4"><a href="dashboard.html">Dashboard</a><a href="messages.html">กล่องข้อความ</a><a href="library.html">เอกสาร/กิจกรรม</a><a href="../index.html">ดูเว็บไซต์</a><button id="logout">ออกจากระบบ</button></nav></div></header>
+<main class="max-w-7xl mx-auto p-5 md:p-10">
+ <div class="mb-8"><p class="text-wine font-semibold">USER & PERMISSION MANAGEMENT</p><h1 class="text-3xl font-bold">กำหนดสิทธิ์การใช้งาน</h1><p id="identity" class="text-sm opacity-60 mt-2"></p></div>
+ <section class="glass rounded-2xl p-6 mb-8">
+  <h2 class="text-xl font-bold mb-2">กลุ่มงานในระบบ</h2><p class="text-sm opacity-70 mb-4">กำหนดสิทธิ์แยกตามกลุ่มงาน สมาชิกแต่ละคนจะได้รับสิทธิ์ตามกลุ่มที่กำหนด</p>
+  <div id="groups" class="grid md:grid-cols-3 gap-3"></div>
+ </section>
+ <section class="glass rounded-2xl p-6 mb-8">
+  <div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="text-xl font-bold">สมาชิกผู้ดูแลระบบ</h2><p class="text-sm opacity-70">เพิ่มบัญชี Auth ที่มีอยู่แล้วด้วย User UUID จาก Supabase Authentication</p></div></div>
+  <form id="add-member" class="grid md:grid-cols-[1fr_1fr_auto] gap-3 mb-5">
+   <input name="user_id" class="rounded-xl border p-3 text-black" placeholder="User UUID จาก Supabase Auth" required pattern="[0-9a-fA-F-]{36}">
+   <select name="group_id" id="member-group" class="rounded-xl border p-3 text-black" required></select>
+   <button class="brand-gradient text-white rounded-xl px-5 py-3">เพิ่มสมาชิก</button>
+  </form>
+  <div id="members" class="space-y-3">กำลังโหลด...</div>
+ </section>
+ <section class="glass rounded-2xl p-6">
+  <div class="flex flex-wrap justify-between gap-3 items-center mb-4"><div><h2 class="text-xl font-bold">สิทธิ์ของแต่ละกลุ่มงาน</h2><p class="text-sm opacity-70">เปิด/ปิดสิทธิ์ดู เพิ่ม แก้ไข ลบ และเผยแพร่ ได้แยกตามหมวดข้อมูล</p></div><select id="selected-group" class="rounded-xl border p-3 text-black"></select></div>
+  <div id="permission-matrix" class="overflow-x-auto">กำลังโหลดสิทธิ์...</div>
+  <p id="status" role="status" class="text-sm opacity-60 mt-4"></p>
+ </section>
+</main>
+<script src="../assets/js/supabase.js"></script>
+<script>
+(async()=>{
+ const db=schoolSupabase,$=s=>document.querySelector(s);
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const modules=[['news','ข่าวประชาสัมพันธ์'],['personnel','ข้อมูลบุคลากร'],['downloads','เอกสารดาวน์โหลด'],['galleries','ภาพกิจกรรม'],['events','ปฏิทินกิจกรรม'],['contact_messages','กล่องข้อความติดต่อ'],['class_overview','ข้อมูลภาพรวมชั้นเรียน']];
+ const actions=[['view','ดู'],['create','เพิ่ม'],['update','แก้ไข'],['delete','ลบ'],['publish','เผยแพร่']];
+ const {data:{user},error:authError}=await db.auth.getUser();
+ if(authError||!user){location.replace('login.html');return}
+ const {data:me,error:meError}=await db.from('admin_users').select('role').eq('user_id',user.id).maybeSingle();
+ if(meError||!me){await db.auth.signOut();location.replace('login.html');return}
+ if(me.role!=='owner'){document.querySelector('main').innerHTML='<section class="glass rounded-2xl p-8"><h1 class="text-2xl font-bold">ไม่มีสิทธิ์เข้าถึง</h1><p class="mt-2">เฉพาะผู้ดูแลสูงสุด (Owner) เท่านั้นที่กำหนดสิทธิ์และจัดการสมาชิกได้</p><a class="underline text-wine mt-4 inline-block" href="dashboard.html">กลับ Dashboard</a></section>';return}
+ $('#identity').textContent=(user.email||'ผู้ดูแล')+' · Owner';
+ let groups=[],members=[];
+ async function loadGroups(){
+  const {data,error}=await db.from('admin_groups').select('id,name,slug,description').order('name');
+  if(error)throw error;groups=data||[];
+  $('#groups').innerHTML=groups.map(g=>'<article class="border rounded-xl p-4"><b>'+esc(g.name)+'</b><p class="text-sm opacity-70 mt-1">'+esc(g.description||'')+'</p></article>').join('');
+  const options=groups.map(g=>'<option value="'+g.id+'">'+esc(g.name)+'</option>').join('');
+  $('#member-group').innerHTML=options;$('#selected-group').innerHTML=options;
+ }
+ async function loadMembers(){
+  const [{data:rows,error},]=await Promise.all([db.from('admin_users').select('user_id,role,group_id,created_at').order('created_at')]);
+  if(error)throw error;members=rows||[];
+  $('#members').innerHTML=members.map(m=>{
+   const group=groups.find(g=>g.id===m.group_id);
+   return '<article class="border rounded-xl p-4 grid md:grid-cols-[1fr_220px_auto] gap-3 items-center"><div><b class="text-sm break-all">'+esc(m.user_id)+'</b><p class="text-xs opacity-60">บทบาท: '+esc(m.role)+(m.role==='owner'?' · สิทธิ์สูงสุด':'')+'</p></div><select class="rounded-lg border p-2 text-black" data-member-group="'+m.user_id+'" '+(m.role==='owner'?'disabled':'')+'><option value="">ยังไม่อยู่ในกลุ่ม</option>'+groups.map(g=>'<option value="'+g.id+'" '+(m.group_id===g.id?'selected':'')+'>'+esc(g.name)+'</option>').join('')+'</select><button class="text-red-700 underline text-sm" data-remove-member="'+m.user_id+'" '+(m.role==='owner'?'disabled':'')+'>ถอนสิทธิ์</button></article>';
+  }).join('')||'<p class="opacity-60">ยังไม่มีสมาชิกผู้ดูแล</p>';
+ }
+ async function loadPermissions(){
+  const gid=$('#selected-group').value;if(!gid)return;
+  const {data,error}=await db.from('group_permissions').select('module,action,allowed').eq('group_id',gid);
+  if(error)throw error;
+  const map=new Map((data||[]).map(p=>[p.module+':'+p.action,p.allowed]));
+  $('#permission-matrix').innerHTML='<table class="w-full text-sm"><thead><tr class="border-b"><th class="text-left p-3">หมวดข้อมูล</th>'+actions.map(a=>'<th class="p-3">'+a[1]+'</th>').join('')+'</tr></thead><tbody>'+modules.map(([m,label])=>'<tr class="border-b"><th class="text-left p-3 whitespace-nowrap">'+label+'</th>'+actions.map(([a])=>'<td class="text-center p-3"><input type="checkbox" class="h-5 w-5 accent-[#701d32]" data-module="'+m+'" data-action="'+a+'" '+(map.get(m+':'+a)?'checked':'')+' aria-label="'+label+' '+a+'"></td>').join('')+'</tr>').join('')+'</tbody></table>';
+ }
+ $('#add-member').addEventListener('submit',async e=>{
+  e.preventDefault();const f=Object.fromEntries(new FormData(e.currentTarget).entries());
+  const {error}=await db.from('admin_users').upsert({user_id:f.user_id.trim(),role:'editor',group_id:f.group_id},{onConflict:'user_id'});
+  if(error){Swal.fire('เพิ่มสมาชิกไม่สำเร็จ',error.message,'error');return}
+  e.currentTarget.reset();await loadMembers();Swal.fire('สำเร็จ','เพิ่มสมาชิกในกลุ่มงานแล้ว','success');
+ });
+ $('#members').addEventListener('change',async e=>{
+  const s=e.target.closest('[data-member-group]');if(!s)return;
+  const {error}=await db.from('admin_users').update({group_id:s.value||null}).eq('user_id',s.dataset.memberGroup);
+  if(error){Swal.fire('เปลี่ยนกลุ่มไม่สำเร็จ',error.message,'error');await loadMembers()}else Swal.fire({toast:true,position:'top-end',icon:'success',title:'บันทึกกลุ่มงานแล้ว',showConfirmButton:false,timer:1500});
+ });
+ $('#members').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-remove-member]');if(!b)return;
+  const ok=await Swal.fire({title:'ถอนสิทธิ์ผู้ใช้นี้?',text:'ผู้ใช้นี้จะไม่สามารถเข้าระบบผู้ดูแลได้',icon:'warning',showCancelButton:true,confirmButtonText:'ถอนสิทธิ์',cancelButtonText:'ยกเลิก'});
+  if(!ok.isConfirmed)return;
+  const {error}=await db.from('admin_users').delete().eq('user_id',b.dataset.removeMember);
+  if(error)Swal.fire('ถอนสิทธิ์ไม่สำเร็จ',error.message,'error');else await loadMembers();
+ });
+ $('#permission-matrix').addEventListener('change',async e=>{
+  const c=e.target.closest('[data-module]');if(!c)return;
+  const gid=$('#selected-group').value;
+  const {error}=await db.from('group_permissions').upsert({group_id:gid,module:c.dataset.module,action:c.dataset.action,allowed:c.checked},{onConflict:'group_id,module,action'});
+  if(error){c.checked=!c.checked;$('#status').textContent='บันทึกไม่สำเร็จ: '+error.message}else $('#status').textContent='บันทึกสิทธิ์เรียบร้อย';
+ });
+ $('#selected-group').addEventListener('change',()=>loadPermissions().catch(e=>$('#status').textContent=e.message));
+ $('#logout').onclick=async()=>{await db.auth.signOut();location.replace('login.html')};
+ try{await loadGroups();await loadMembers();await loadPermissions()}catch(e){$('#status').textContent='โหลดข้อมูลไม่สำเร็จ: '+e.message}
+})().catch(e=>{const s=document.querySelector('#status');if(s)s.textContent='เกิดข้อผิดพลาด: '+e.message});
+</script></body></html>
