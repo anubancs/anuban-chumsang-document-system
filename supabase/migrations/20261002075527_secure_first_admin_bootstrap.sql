@@ -1,3 +1,0 @@
--- Reconciliation marker for a migration already applied to production.
--- The temporary secure_first_admin_bootstrap RPC was removed from the production schema
--- and superseded by the atomic auth.users bootstrap trigger migration.
