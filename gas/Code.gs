@@ -5,7 +5,7 @@
  */
 const DEFAULT_DRIVE_FOLDER_ID = '1ptff4TPbIh9hlCwss4Fxg-lVpZfI33j8';
 const SUPABASE_URL = 'https://uwebbofczidcfnjbvsqu.supabase.co';
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 const SCHOOL_SITE_ORIGIN = 'https://anubancs.github.io';
 const IMAGE_TYPES = ['image/jpeg','image/png','image/webp','image/gif'];
 
@@ -44,7 +44,7 @@ function uploadImage_(p) {
   const encoded = String(p.base64 || '');
   if (!encoded) throw new Error('ไม่พบข้อมูลภาพ');
   const bytes = Utilities.base64Decode(encoded);
-  if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new Error('ขนาดภาพต้องไม่เกิน 6 MB');
+  if (!bytes.length || bytes.length > MAX_IMAGE_BYTES) throw new Error('ขนาดภาพต้องไม่เกิน 20 MB');
   const original = String(p.filename || 'image').replace(/[^a-zA-Z0-9._ -]/g,'_').slice(0,100);
   const ext = mime === 'image/jpeg' ? 'jpg' : mime.split('/')[1];
   const filename = Utilities.formatDate(new Date(),'Asia/Bangkok','yyyyMMdd_HHmmss') + '_' +
