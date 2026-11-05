@@ -1,7 +1,7 @@
 /** Authenticated image uploader for the school's Google Drive. */
 (() => {
   window.SCHOOL_GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbygkL-oP_5_5QQsHA5ZshaJOwHpYVRJElV3dsD-1kPvQG0ghRh_oR3DRP9VDYDEK-8g/exec';
-  const maxBytes=6*1024*1024;
+  const maxBytes=20*1024*1024;
   const base64=file=>new Promise((resolve,reject)=>{
     const reader=new FileReader();
     reader.onload=()=>resolve(String(reader.result).split(',')[1]||'');
@@ -12,7 +12,7 @@
     const endpoint=window.SCHOOL_GAS_WEB_APP_URL;
     if(!endpoint) throw new Error('ยังไม่ได้ตั้งค่า URL ของ Google Apps Script');
     if(!/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) throw new Error('รองรับ JPG, PNG, WEBP และ GIF เท่านั้น');
-    if(file.size>maxBytes) throw new Error('ภาพต้องมีขนาดไม่เกิน 6 MB');
+    if(file.size>maxBytes) throw new Error('ภาพต้องมีขนาดไม่เกิน 20 MB');
     const {data:{session},error}=await window.schoolSupabase.auth.getSession();
     if(error||!session?.access_token) throw new Error('กรุณาเข้าสู่ระบบใหม่');
     const requestId='upload_'+Date.now()+'_'+Math.random().toString(36).slice(2);
