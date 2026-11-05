@@ -1,0 +1,4 @@
+-- Apply this file to Supabase SQL Editor (or use the already-applied migrations).
+-- Full canonical schema is maintained in Supabase migration history.
+-- Security model: public SELECT only for published content; admin writes use private.is_admin().
+-- See README.md for first-admin bootstrap and verification.
