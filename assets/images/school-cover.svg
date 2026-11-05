@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" role="img" aria-labelledby="title desc">
+<title id="title">ภาพประกอบโรงเรียน</title><desc id="desc">ภาพประกอบอาคารเรียน ต้นไม้ และท้องฟ้า สำหรับใช้แทนภาพโรงเรียนจริงชั่วคราว</desc>
+<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#f6d8b5"/><stop offset="1" stop-color="#fff3df"/></linearGradient><linearGradient id="wall" x2="0" y2="1"><stop stop-color="#fffaf0"/><stop offset="1" stop-color="#ead6bd"/></linearGradient></defs>
+<rect width="1200" height="900" fill="url(#sky)"/><circle cx="950" cy="170" r="82" fill="#f0b65d" opacity=".9"/>
+<path d="M0 630 Q230 540 450 630 T900 610 T1200 590 V900 H0Z" fill="#9ebd8b"/><path d="M0 720 Q300 650 600 710 T1200 690 V900 H0Z" fill="#6f9b70"/>
+<rect x="250" y="340" width="700" height="350" rx="12" fill="url(#wall)" stroke="#8a5a43" stroke-width="12"/>
+<path d="M205 360 L600 150 L995 360Z" fill="#8d3444" stroke="#6c2937" stroke-width="12"/>
+<rect x="530" y="510" width="140" height="180" rx="8" fill="#80513d"/><path d="M565 545h70v145h-70z" fill="#f3d8ae"/>
+<g fill="#7da7b6" stroke="#8a5a43" stroke-width="10"><rect x="310" y="415" width="125" height="105" rx="8"/><rect x="470" y="415" width="125" height="75" rx="8"/><rect x="700" y="415" width="125" height="75" rx="8"/><rect x="860" y="415" width="55" height="105" rx="8"/></g>
+<g stroke="#fff4dd" stroke-width="8"><path d="M372 415v105M310 468h125M532 415v75M470 452h125M762 415v75M700 452h125"/></g>
+<g><rect x="95" y="500" width="30" height="180" fill="#76543b"/><circle cx="110" cy="470" r="95" fill="#4e855e"/><circle cx="65" cy="510" r="65" fill="#60946a"/><circle cx="155" cy="520" r="60" fill="#77a66d"/></g>
+<g><rect x="1060" y="500" width="30" height="180" fill="#76543b"/><circle cx="1075" cy="465" r="95" fill="#4e855e"/><circle cx="1030" cy="510" r="65" fill="#60946a"/><circle cx="1120" cy="520" r="60" fill="#77a66d"/></g>
+<path d="M0 770 Q250 720 500 770 T1000 760 T1200 750 V900 H0Z" fill="#527f5c"/>
+<text x="600" y="835" text-anchor="middle" font-family="sans-serif" font-size="34" fill="#fff8ec" opacity=".9">ANUBAN CHUMSAENG SCHOOL</text>
+</svg>
