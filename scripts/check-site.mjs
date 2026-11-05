@@ -18,7 +18,7 @@ for (const file of htmlFiles) {
   const html = fs.readFileSync(file, 'utf8');
   for (const match of html.matchAll(/<(?:a|link|script|img|source)\b[^>]*?\b(?:href|src)\s*=\s*["']([^"']+)["'][^>]*>/gi)) {
     const raw = match[1].trim();
-    if (!raw || ignored.test(raw) || raw.startsWith('#')) continue;
+    if (!raw || ignored.test(raw) || raw.startsWith('#') || raw.includes('${')) continue;
     const clean = decodeURIComponent(raw.split(/[?#]/, 1)[0]);
     if (!clean) continue;
     let target;
