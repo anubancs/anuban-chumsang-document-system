@@ -64,6 +64,29 @@
 
 **ข้อควรระวัง:** GAS Web App ที่เปิดให้บุคคลทั่วไปเรียกได้อาจถูกส่งข้อความขยะได้ โค้ดปัจจุบันมี validation, honeypot และ throttling เบื้องต้น แต่ยังไม่ใช่ระบบป้องกันสแปมระดับสูง ควรทดสอบในกลุ่ม Telegram ส่วนตัวก่อนใช้งานจริง
 
+
+## ตั้งค่าระบบ AI Chatbot
+
+ระบบผู้ช่วย AI ใช้ Google Apps Script เป็นตัวกลางเรียก Gemini API โดยไม่ส่ง API Key ไปยัง Browser
+
+1. สร้าง Gemini API Key ใน [Google AI Studio](https://aistudio.google.com/app/apikey)
+2. เปิด Apps Script Project เดิมที่ใช้เชื่อม Google Drive
+3. ไปที่ **Project Settings → Script Properties** แล้วเพิ่ม:
+   - `GEMINI_API_KEY` — API Key จาก Google AI Studio (เก็บเป็นความลับ ห้ามใส่ใน GitHub)
+   - `SUPABASE_PUBLISHABLE_KEY` — ใช้ค่า Publishable Key เดิมที่ตั้งไว้สำหรับอัปโหลดภาพ
+   - `GEMINI_MODEL` — ไม่บังคับ ค่าเริ่มต้น `gemini-2.5-flash`
+   - `AI_DAILY_LIMIT` — ไม่บังคับ ค่าเริ่มต้น 100 คำถามต่อวัน
+4. คัดลอกโค้ดล่าสุดจาก `gas/Code.gs` ใน GitHub ไปแทนที่โค้ดใน Apps Script Project เดิม แล้วบันทึก
+5. เลือก **Deploy → Manage deployments → Edit → New version → Deploy** เพื่อให้ Web App ใช้โค้ดล่าสุด (URL เดิมไม่ต้องเปลี่ยน)
+6. เปิดเว็บไซต์หน้าแรกแล้วกดปุ่ม **ถาม AI โรงเรียน** เพื่อทดสอบ
+
+**ข้อจำกัดและความปลอดภัย**
+- Chatbot ตอบจากข้อมูลสาธารณะที่เผยแพร่ใน Supabase เท่านั้น ได้แก่ ข่าว บุคลากร เอกสาร กิจกรรม และภาพกิจกรรม
+- ไม่อ่านข้อมูลผู้ดูแล ข้อความติดต่อ หรือข้อมูลนักเรียนรายบุคคล
+- มีการจำกัดจำนวนคำถามต่อ client session และโควตารวมรายวันเบื้องต้น แต่ยังไม่ใช่ระบบป้องกันการโจมตีแบบสมบูรณ์ ควรตั้ง `AI_DAILY_LIMIT` ให้เหมาะกับงบประมาณและตรวจสอบ Usage ใน Google AI Studio
+- API Key ต้องอยู่ใน Script Properties เท่านั้น หากพบว่ารั่วไหลให้เพิกถอนและสร้างใหม่ทันที
+- โมเดลและโควตา Gemini อาจเปลี่ยนตามนโยบายผู้ให้บริการ
+
 ## ตั้งค่า Telegram Bot
 
 1. เปิด Telegram ค้นหา `@BotFather` แล้วใช้คำสั่ง `/newbot`
