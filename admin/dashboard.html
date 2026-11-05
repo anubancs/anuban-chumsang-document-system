@@ -13,6 +13,16 @@
     <div class="glass rounded-2xl p-5"><p class="opacity-60">เอกสารดาวน์โหลด</p><strong id="file-count" class="text-3xl">—</strong></div>
   </section>
   <section class="glass rounded-2xl p-6 mb-8">
+    <h2 class="text-xl font-bold mb-2">ภาพหน้าปกเว็บไซต์</h2>
+    <p class="text-sm opacity-70 mb-3">จัดเก็บภาพ Hero Banner ใน Google Drive (สิทธิ์ Owner)</p>
+    <div class="grid md:grid-cols-2 gap-3 items-end">
+      <div><label class="block text-sm mb-1" for="hero-image-url">URL ภาพหน้าปก</label><input id="hero-image-url" class="w-full rounded-xl p-3 text-black" type="url" placeholder="URL จะเติมให้อัตโนมัติเมื่ออัปโหลด"></div>
+      <div><label class="block text-sm mb-1">อัปโหลดภาพหน้าปก (JPG/PNG/WEBP/GIF ไม่เกิน 6 MB)</label><input class="block" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-drive-upload="settings" data-drive-target="#hero-image-url" data-drive-status="#hero-image-status"></div>
+      <p id="hero-image-status" class="text-xs opacity-70 md:col-span-2" role="status"></p>
+      <button id="hero-image-save" type="button" class="brand-gradient text-white rounded-xl p-3">บันทึกภาพหน้าปก</button>
+    </div>
+  </section>
+  <section class="glass rounded-2xl p-6 mb-8">
     <h2 class="text-xl font-bold mb-4">เพิ่มข่าวประชาสัมพันธ์</h2>
     <form id="news-form" class="grid md:grid-cols-2 gap-3">
       <input class="rounded-xl p-3 text-black" name="title" placeholder="หัวข้อข่าว" required maxlength="250">
@@ -55,6 +65,16 @@
   const {data:admin,error:adminError}=await db.from('admin_users').select('role').eq('user_id',user.id).maybeSingle();
   if(adminError||!admin){await db.auth.signOut();location.href='login.html';return}
   $('#whoami').textContent=user.email||'บัญชีผู้ดูแล';$('#role').textContent='สิทธิ์: '+admin.role;
+  const {data:heroSetting}=await db.from('settings').select('value').eq('key','home_hero_image').maybeSingle();
+  if(heroSetting?.value) $('#hero-image-url').value=typeof heroSetting.value==='string'?heroSetting.value:(heroSetting.value.url||'');
+  $('#hero-image-save').addEventListener('click',async()=>{
+    const url=$('#hero-image-url').value.trim();
+    if(!/^https:\/\//i.test(url)){Swal.fire('URL ไม่ถูกต้อง','กรุณาอัปโหลดภาพหรือระบุ HTTPS URL','warning');return}
+    const {error}=await db.from('settings').upsert({key:'home_hero_image',value:{url},is_public:true},{onConflict:'key'});
+    if(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');return}
+    $('#hero-image-status').textContent='บันทึกภาพหน้าปกแล้ว';
+    Swal.fire('สำเร็จ','บันทึกภาพหน้าปกเว็บไซต์แล้ว','success');
+  });
   const count=async t=>{const r=await db.from(t).select('*',{count:'exact',head:true});if(r.error)throw r.error;return r.count??0};
   async function stats(){try{$('#news-count').textContent=await count('news');$('#staff-count').textContent=await count('personnel');$('#file-count').textContent=await count('downloads')}catch(e){$('#status').textContent='โหลดสถิติไม่สำเร็จ: '+e.message}}
   async function loadNews(){
