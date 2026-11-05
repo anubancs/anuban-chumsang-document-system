@@ -53,8 +53,8 @@ function uploadImage_(p) {
   const folder = getOrCreateFolder_(root,category);
   const file = folder.createFile(Utilities.newBlob(bytes,mime,filename));
   file.setSharing(DriveApp.Access.ANYONE_WITH_LINK,DriveApp.Permission.VIEW);
-  return json_({ok:true,id:file.getId(),name:file.getName(),url:imageUrl_(file.getId()),
-    module:category,uploadedBy:user.email || user.id});
+  return {ok:true,id:file.getId(),name:file.getName(),url:imageUrl_(file.getId()),
+    module:category,uploadedBy:user.email || user.id};
 }
 function authorizeUpload_(token,category) {
   if (!token) throw new Error('กรุณาเข้าสู่ระบบใหม่');
