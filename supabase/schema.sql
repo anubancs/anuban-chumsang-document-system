@@ -166,11 +166,13 @@ using ((select private.is_admin())) with check ((select private.is_admin()));
 drop policy if exists "admins delete contact messages" on public.contact_messages;
 create policy "admins delete contact messages" on public.contact_messages for delete to authenticated using ((select private.is_admin()));
 
+revoke all privileges on all tables in schema public from anon, authenticated;
 grant usage on schema public to anon, authenticated;
 grant select on public.categories,public.news,public.personnel,public.downloads,public.galleries,
-  public.events,public.settings,public.class_overview to anon,authenticated;
+  public.events,public.settings,public.class_overview to anon;
+grant select on public.categories,public.news,public.personnel,public.downloads,public.galleries,
+  public.events,public.settings,public.class_overview,public.admin_users,public.contact_messages to authenticated;
 grant insert on public.contact_messages to anon,authenticated;
-grant select on public.admin_users to authenticated;
 grant insert,update,delete on public.categories,public.news,public.personnel,public.downloads,
   public.galleries,public.events,public.settings,public.class_overview,public.contact_messages to authenticated;
 grant usage,select on all sequences in schema public to authenticated;
