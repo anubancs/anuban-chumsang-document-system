@@ -30,6 +30,11 @@ function doPost(e) {
       catch (uploadError) { return uploadResponse_(requestId, {ok:false,error:String(uploadError && uploadError.message || uploadError)}); }
     }
     if (p.action === 'notify') return notify_(p);
+    if (p.action === 'ai_summary') {
+      const requestId = String(p.request_id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+      try { return uploadResponse_(requestId, schoolAiSummary_(p)); }
+      catch (summaryError) { return uploadResponse_(requestId, {ok:false,error:String(summaryError && summaryError.message || summaryError)}); }
+    }
     if (p.action === 'ai_chat') {
       const requestId = String(p.request_id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
       try { return uploadResponse_(requestId, schoolAiChat_(p)); }
@@ -219,4 +224,36 @@ function enforceAiDailyLimit_(props) {
   } finally {
     lock.releaseLock();
   }
+}
+
+
+function schoolAiSummary_(p) {
+  const title=safe_(p.title,250), source=String(p.content||'').trim().slice(0,12000);
+  if(title.length<3||source.length<80)throw new Error('กรุณากรอกหัวข้อและเนื้อหาข่าวอย่างน้อย 80 ตัวอักษร');
+  const user=authorizeNewsAi_(p.access_token), props=PropertiesService.getScriptProperties();
+  const apiKey=props.getProperty('GEMINI_API_KEY');if(!apiKey)throw new Error('ระบบ AI ยังไม่ได้ตั้งค่า GEMINI_API_KEY');
+  const cache=CacheService.getScriptCache(), rateKey='ai_summary_'+user.id, used=Number(cache.get(rateKey)||0);
+  if(used>=10)throw new Error('ใช้เครื่องมือสรุปข่าวครบ 10 ครั้งใน 5 นาที กรุณารอสักครู่');
+  cache.put(rateKey,String(used+1),300);enforceAiDailyLimit_(props);
+  const model=(props.getProperty('GEMINI_MODEL')||'gemini-2.5-flash').replace(/[^a-zA-Z0-9._-]/g,'');
+  const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
+  const payload={systemInstruction:{parts:[{text:'คุณเป็นบรรณาธิการข่าวประชาสัมพันธ์ของโรงเรียนไทย เขียนภาษาไทยทางการ กระชับ ชัดเจน ห้ามเพิ่มข้อเท็จจริง ตัวเลข ชื่อบุคคล วันเวลา หรือสถานที่ที่ไม่มีในต้นฉบับ ส่งคืนเฉพาะคำโปรยข่าว 1-2 ประโยค ไม่เกิน 350 ตัวอักษร'}]},
+    contents:[{role:'user',parts:[{text:'หัวข้อข่าว: '+title+'\nเนื้อหาต้นฉบับ:\n'+source+'\n\nช่วยเขียนคำโปรยข่าวที่ตรงกับต้นฉบับ'}]}],
+    generationConfig:{temperature:0.2,maxOutputTokens:180}};
+  const response=UrlFetchApp.fetch(endpoint,{method:'post',contentType:'application/json',headers:{'x-goog-api-key':apiKey},payload:JSON.stringify(payload),muteHttpExceptions:true});
+  const code=response.getResponseCode(), body=JSON.parse(response.getContentText()||'{}');
+  if(code<200||code>=300){console.error('Gemini summary error HTTP '+code+': '+response.getContentText().slice(0,400));if(code===429)throw new Error('ระบบ AI มีคำขอมากเกินไป กรุณาลองใหม่ภายหลัง');throw new Error('ไม่สามารถสรุปข่าวได้ในขณะนี้');}
+  const excerpt=body?.candidates?.[0]?.content?.parts?.map(function(x){return x.text||'';}).join('').trim().slice(0,500);
+  if(!excerpt)throw new Error('AI ไม่ได้ส่งคำโปรยกลับมา');return {ok:true,excerpt:excerpt};
+}
+function authorizeNewsAi_(token) {
+  if(!token)throw new Error('ไม่พบเซสชันผู้ดูแล กรุณาเข้าสู่ระบบใหม่');
+  const key=PropertiesService.getScriptProperties().getProperty('SUPABASE_PUBLISHABLE_KEY');if(!key)throw new Error('ไม่พบ SUPABASE_PUBLISHABLE_KEY ใน Apps Script');
+  const headers={apikey:key,Authorization:'Bearer '+token};
+  const auth=UrlFetchApp.fetch(SUPABASE_URL+'/auth/v1/user',{headers:headers,muteHttpExceptions:true});
+  if(auth.getResponseCode()!==200)throw new Error('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+  const user=JSON.parse(auth.getContentText()||'{}');
+  const permission=UrlFetchApp.fetch(SUPABASE_URL+'/rest/v1/rpc/can_upload_media',{method:'post',contentType:'application/json',headers:headers,payload:JSON.stringify({p_module:'news'}),muteHttpExceptions:true});
+  if(permission.getResponseCode()!==200||permission.getContentText()!=='true')throw new Error('บัญชีนี้ไม่มีสิทธิ์ใช้ AI ช่วยสรุปข่าว');
+  return user;
 }
