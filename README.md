@@ -67,7 +67,7 @@
 
 ## ตั้งค่าระบบ AI Chatbot
 
-ระบบผู้ช่วย AI ใช้ Google Apps Script เป็นตัวกลางเรียก Gemini API โดยไม่ส่ง API Key ไปยัง Browser
+ระบบ AI ใช้ Google Apps Script เป็นตัวกลางเรียก Gemini API โดยไม่ส่ง API Key ไปยัง Browser ประกอบด้วยผู้ช่วยตอบคำถามหน้าแรกที่ค้นข้อมูลข่าว บุคลากร กิจกรรม แกลเลอรี และเอกสารดาวน์โหลด รวมถึงปุ่ม AI ช่วยเขียนคำโปรยข่าวในหน้า Dashboard (จำกัดสิทธิ์เฉพาะผู้ดูแลที่มีสิทธิ์จัดการข่าว) การค้นหาเอกสารทำผ่านการถามชื่อเอกสาร/ประเภท/คำอธิบายกับผู้ช่วย AI และ AI จะอ้าง URL เอกสารเมื่อมีข้อมูล
 
 1. สร้าง Gemini API Key ใน [Google AI Studio](https://aistudio.google.com/app/apikey)
 2. เปิด Apps Script Project เดิมที่ใช้เชื่อม Google Drive
@@ -107,4 +107,4 @@
 - Google Apps Script ยังต้อง Deploy และตั้งค่า Script Properties โดยเจ้าของบัญชี Google
 - ยังต้องทดสอบ Login, reset password, CRUD และฟอร์มติดต่อจริงใน Browser
 - AI Chatbot, AI Summary และ AI Document Search ยังไม่ได้เชื่อมต่อ
-- ยังไม่มีการทดสอบ End-to-End อัตโนมัติ
+- ยังต้องตั้งค่า GEMINI_API_KEY และ Deploy Apps Script เวอร์ชันล่าสุดก่อนทดสอบ AI จริง\n- ยังไม่มีการทดสอบ End-to-End อัตโนมัติ
