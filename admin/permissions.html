@@ -12,7 +12,7 @@
   <div id="groups" class="grid md:grid-cols-3 gap-3"></div>
  </section>
  <section class="glass rounded-2xl p-6 mb-8">
-  <div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="text-xl font-bold">สมาชิกผู้ดูแลระบบ</h2><p class="text-sm opacity-70">เลือกบัญชีจากผู้ใช้ทั้งหมดใน Supabase Authentication โดยระบบจะแสดงอีเมลและไม่ต้องคัดลอก UUID</p></div></div>
+  <div class="flex flex-wrap justify-between items-center gap-3 mb-4"><div><h2 class="text-xl font-bold">สมาชิกผู้ดูแลระบบ</h2><p class="text-sm opacity-70">เลือกบัญชีจากผู้ใช้ทั้งหมดใน Supabase Authentication โดยระบบจะแสดงชื่อ-นามสกุล ตำแหน่ง และอีเมล เพื่อให้เลือกบัญชีได้ถูกต้อง</p></div></div>
   <form id="add-member" class="grid md:grid-cols-[minmax(0,2fr)_1fr_auto] gap-3 mb-5">
    <select name="user_id" id="auth-user-select" class="rounded-xl border p-3 text-black" required><option value="">กำลังโหลดรายชื่อผู้ใช้...</option></select>
    <select name="group_id" id="member-group" class="rounded-xl border p-3 text-black" required></select>
@@ -52,7 +52,7 @@
   if(error)throw error;authUsers=data||[];
   const assigned=new Set(members.map(m=>m.user_id));
   const available=authUsers.filter(u=>!assigned.has(u.user_id));
-  $('#auth-user-select').innerHTML='<option value="">เลือกบัญชีผู้ใช้ ('+available.length+' บัญชีที่ยังไม่ได้กำหนดสิทธิ์)</option>'+available.map(u=>'<option value="'+u.user_id+'">'+esc(u.email||'ไม่มีอีเมล')+' · '+esc(u.user_id.slice(0,8))+'</option>').join('');
+  $('#auth-user-select').innerHTML='<option value="">เลือกบัญชีผู้ใช้ ('+available.length+' บัญชีที่ยังไม่ได้กำหนดสิทธิ์)</option>'+available.map(u=>'<option value="'+u.user_id+'">'+esc(u.full_name||'ไม่ระบุชื่อ')+(u.position?' · '+esc(u.position):'')+' · '+esc(u.email||'ไม่มีอีเมล')+'</option>').join('');
  }
  async function loadMembers(){
   const {data:rows,error}=await db.from('admin_users').select('user_id,role,group_id,created_at').order('created_at');
