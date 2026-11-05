@@ -17,7 +17,7 @@
     <p class="text-sm opacity-70 mb-3">จัดเก็บภาพ Hero Banner ใน Google Drive (สิทธิ์ Owner)</p>
     <div class="grid md:grid-cols-2 gap-3 items-end">
       <div><label class="block text-sm mb-1" for="hero-image-url">URL ภาพหน้าปก</label><input id="hero-image-url" class="w-full rounded-xl p-3 text-black" type="url" placeholder="URL จะเติมให้อัตโนมัติเมื่ออัปโหลด"></div>
-      <div><label class="block text-sm mb-1">อัปโหลดภาพหน้าปก (JPG/PNG/WEBP/GIF ไม่เกิน 6 MB)</label><input class="block" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-drive-upload="settings" data-drive-target="#hero-image-url" data-drive-status="#hero-image-status"></div>
+      <div><label class="block text-sm mb-1">อัปโหลดภาพหน้าปก (JPG/PNG/WEBP/GIF ไม่เกิน 20 MB)</label><input class="block" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-drive-upload="settings" data-drive-target="#hero-image-url" data-drive-status="#hero-image-status"></div>
       <p id="hero-image-status" class="text-xs opacity-70 md:col-span-2" role="status"></p>
       <button id="hero-image-save" type="button" class="brand-gradient text-white rounded-xl p-3">บันทึกภาพหน้าปก</button>
     </div>
@@ -27,7 +27,7 @@
     <form id="news-form" class="grid md:grid-cols-2 gap-3">
       <input class="rounded-xl p-3 text-black" name="title" placeholder="หัวข้อข่าว" required maxlength="250">
       <input class="rounded-xl p-3 text-black" name="slug" placeholder="slug ภาษาอังกฤษ" required pattern="[a-z0-9-]+" maxlength="250">
-      <input class="rounded-xl p-3 text-black md:col-span-2" name="cover_image_url" type="url" placeholder="URL ภาพหน้าปก (ระบบเติมให้อัตโนมัติเมื่ออัปโหลด)"><label class="md:col-span-2 text-sm">หรือเลือกภาพหน้าปกจากเครื่อง (JPG/PNG/WEBP/GIF ไม่เกิน 6 MB)<input id="news-cover-file" class="block mt-2" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-drive-upload="news" data-drive-target="#news-form [name=cover_image_url]" data-drive-status="#news-cover-status"></label><p id="news-cover-status" class="md:col-span-2 text-sm opacity-70" role="status"></p>
+      <input class="rounded-xl p-3 text-black md:col-span-2" name="cover_image_url" type="url" placeholder="URL ภาพหน้าปก (ระบบเติมให้อัตโนมัติเมื่ออัปโหลด)"><label class="md:col-span-2 text-sm">หรือเลือกภาพหน้าปกจากเครื่อง (JPG/PNG/WEBP/GIF ไม่เกิน 20 MB)<input id="news-cover-file" class="block mt-2" type="file" accept="image/jpeg,image/png,image/webp,image/gif" data-drive-upload="news" data-drive-target="#news-form [name=cover_image_url]" data-drive-status="#news-cover-status"></label><p id="news-cover-status" class="md:col-span-2 text-sm opacity-70" role="status"></p>
       <textarea class="rounded-xl p-3 text-black md:col-span-2" name="excerpt" placeholder="คำโปรย" maxlength="500"></textarea>
       <textarea class="rounded-xl p-3 text-black md:col-span-2" name="content" rows="6" placeholder="เนื้อหาข่าว" required></textarea>
       <div class="flex flex-wrap gap-3 md:col-span-2"><button class="brand-gradient text-white rounded-xl px-5 py-3">บันทึกฉบับร่าง</button><button id="publish-news" type="button" class="btn-gold rounded-xl px-5 py-3">บันทึกและเผยแพร่</button></div>
