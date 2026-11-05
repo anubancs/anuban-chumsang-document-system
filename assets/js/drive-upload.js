@@ -1,6 +1,6 @@
 /** Authenticated image uploader for the school's Google Drive. */
 (() => {
-  window.SCHOOL_GAS_WEB_APP_URL = window.SCHOOL_GAS_WEB_APP_URL || '';
+  window.SCHOOL_GAS_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbygkL-oP_5_5QQsHA5ZshaJOwHpYVRJElV3dsD-1kPvQG0ghRh_oR3DRP9VDYDEK-8g/exec';
   const maxBytes=6*1024*1024;
   const base64=file=>new Promise((resolve,reject)=>{
     const reader=new FileReader();
