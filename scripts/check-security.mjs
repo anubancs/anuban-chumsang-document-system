@@ -23,7 +23,7 @@ const secretPatterns = [
   { label: 'Telegram bot token', pattern: /\b\d{8,12}:[A-Za-z0-9_-]{30,}\b/ }
 ];
 
-for (const file of files) {
+for (const file of files.filter(file => file !== 'scripts/check-security.mjs')) {
   const source = fs.readFileSync(file, 'utf8');
   for (const secret of secretPatterns) {
     if (secret.pattern.test(source)) {
