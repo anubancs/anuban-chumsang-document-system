@@ -30,11 +30,21 @@
 
     async submitContact(form) {
       const payload = Object.fromEntries(new FormData(form).entries());
+
+      // Silently discard honeypot submissions before they reach the database or inbox.
+      if (String(payload.website || '').trim()) return;
+
+      const senderName = String(payload.sender_name || '').trim();
+      const message = String(payload.message || '').trim();
+      if (senderName.length < 2 || message.length < 5) {
+        throw new Error('กรุณากรอกชื่ออย่างน้อย 2 ตัวอักษร และข้อความอย่างน้อย 5 ตัวอักษร');
+      }
+
       const { error } = await db().from('contact_messages').insert({
-        sender_name: String(payload.sender_name || '').trim(),
+        sender_name: senderName,
         sender_email: String(payload.sender_email || '').trim() || null,
         subject: String(payload.subject || '').trim() || null,
-        message: String(payload.message || '').trim()
+        message
       });
       if (error) throw error;
 
