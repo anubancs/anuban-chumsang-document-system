@@ -24,7 +24,11 @@ function doGet(e) {
 function doPost(e) {
   const p = e && e.parameter || {};
   try {
-    if (p.action === 'upload') {\n      const requestId = String(p.request_id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);\n      try { return uploadResponse_(requestId, uploadImage_(p)); }\n      catch (uploadError) { return uploadResponse_(requestId, {ok:false,error:String(uploadError && uploadError.message || uploadError)}); }\n    }
+    if (p.action === 'upload') {
+      const requestId = String(p.request_id || '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 80);
+      try { return uploadResponse_(requestId, uploadImage_(p)); }
+      catch (uploadError) { return uploadResponse_(requestId, {ok:false,error:String(uploadError && uploadError.message || uploadError)}); }
+    }
     if (p.action === 'notify') return notify_(p);
     return json_({ok:false,error:'Unsupported action'});
   } catch (err) {
@@ -104,7 +108,7 @@ function safe_(v,n) { return String(v||'').replace(/[<>]/g,'').trim().slice(0,n)
 function json_(v) { return ContentService.createTextOutput(JSON.stringify(v)).setMimeType(ContentService.MimeType.JSON); }
 
 function uploadResponse_(requestId, result) {
-  const payload = JSON.stringify({type:'school-drive-upload',requestId:requestId,result:result}).replace(/</g,'\\\\u003c');
+  const payload = JSON.stringify({type:'school-drive-upload',requestId:requestId,result:result}).replace(/</g,'\\u003c');
   const html = '<!doctype html><html><body><script>window.top.postMessage(' + payload + ',' +
     JSON.stringify(SCHOOL_SITE_ORIGIN) + ');</script>อัปโหลดเสร็จแล้ว</body></html>';
   return HtmlService.createHtmlOutput(html).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
