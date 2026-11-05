@@ -20,7 +20,7 @@
 - `downloads.html` — ดาวน์โหลดเอกสาร
 - `gallery.html` — ภาพกิจกรรม
 - `contact.html` — แบบฟอร์มติดต่อ
-- `admin/login.html`, `admin/dashboard.html` — ระบบผู้ดูแล
+- `admin/login.html`, `admin/dashboard.html` — ระบบผู้ดูแลข่าวและบุคลากร\n- `admin/library.html` — จัดการเอกสาร ดาวน์โหลด แกลเลอรี และกิจกรรม\n- `.github/workflows/validate.yml` — ตรวจไวยากรณ์ JavaScript อัตโนมัติเมื่อ Push/PR
 
 ## ตั้งค่า Supabase
 
