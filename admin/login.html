@@ -9,34 +9,61 @@
 <link rel="stylesheet" href="../assets/css/style.css">
 </head>
 <body class="min-h-screen grid place-items-center p-5">
-<form id="login" class="glass rounded-3xl p-8 w-full max-w-md">
+<section id="login-panel" class="glass rounded-3xl p-8 w-full max-w-md">
 <h1 class="text-2xl font-bold">ระบบผู้ดูแลเว็บไซต์</h1>
 <p class="opacity-70 mt-2 mb-6">เข้าสู่ระบบด้วยบัญชีที่ได้รับสิทธิ์ผู้ดูแล</p>
+<form id="login">
 <label class="block text-sm mb-2" for="email">อีเมล</label>
 <input id="email" class="w-full rounded-xl border p-3 mb-4 text-black" type="email" name="email" autocomplete="username" required>
 <label class="block text-sm mb-2" for="password">รหัสผ่าน</label>
 <input id="password" class="w-full rounded-xl border p-3 mb-3 text-black" type="password" name="password" autocomplete="current-password" required>
 <button id="submit" class="brand-gradient text-white rounded-xl p-3 w-full font-semibold">เข้าสู่ระบบ</button>
+</form>
 <button id="forgot" type="button" class="block text-center mt-4 w-full underline text-wine">ลืมรหัสผ่าน / ตั้งรหัสผ่านครั้งแรก</button>
 <a class="block text-center mt-5" href="../index.html">กลับหน้าเว็บไซต์</a>
+</section>
+<section id="setup-panel" class="glass rounded-3xl p-8 w-full max-w-md" hidden>
+<h1 class="text-2xl font-bold">ตั้งรหัสผ่าน</h1>
+<p class="opacity-70 mt-2 mb-6">กำหนดรหัสผ่านสำหรับเข้าใช้งานระบบผู้ดูแล</p>
+<form id="setup-form">
+<label class="block text-sm mb-2" for="new-password">รหัสผ่านใหม่ (อย่างน้อย 10 ตัวอักษร)</label>
+<input id="new-password" class="w-full rounded-xl border p-3 mb-4 text-black" type="password" minlength="10" autocomplete="new-password" required>
+<label class="block text-sm mb-2" for="confirm-password">ยืนยันรหัสผ่าน</label>
+<input id="confirm-password" class="w-full rounded-xl border p-3 mb-6 text-black" type="password" minlength="10" autocomplete="new-password" required>
+<button id="save-password" class="brand-gradient text-white rounded-xl p-3 w-full font-semibold">บันทึกรหัสผ่าน</button>
 </form>
+<p id="setup-status" class="text-sm mt-4 opacity-70" role="status"></p>
+</section>
 <script src="../assets/js/supabase.js"></script>
 <script>
 (() => {
-  const form = document.querySelector('#login');
-  const emailInput = document.querySelector('#email');
-  const passwordInput = document.querySelector('#password');
-  const submit = document.querySelector('#submit');
   const db = window.schoolSupabase;
+  const $ = selector => document.querySelector(selector);
+  const params = new URLSearchParams(location.hash.slice(1));
+  const loginPanel = $('#login-panel');
+  const setupPanel = $('#setup-panel');
 
-  form.addEventListener('submit', async (event) => {
+  async function showSetupIfRecovery() {
+    const type = params.get('type');
+    const hasAuthToken = params.has('access_token') || params.has('error_description');
+    if (!['recovery', 'invite', 'signup', 'magiclink'].includes(type) && !hasAuthToken) return;
+    const { data: { session }, error } = await db.auth.getSession();
+    if (error) throw error;
+    if (params.get('error_description')) throw new Error(params.get('error_description'));
+    if (!session) throw new Error('ลิงก์หมดอายุหรือไม่ถูกต้อง กรุณาขอลิงก์ตั้งรหัสผ่านใหม่');
+    loginPanel.hidden = true;
+    setupPanel.hidden = false;
+    $('#setup-status').textContent = 'ยืนยันลิงก์แล้ว สามารถตั้งรหัสผ่านได้';
+  }
+
+  $('#login').addEventListener('submit', async event => {
     event.preventDefault();
-    submit.disabled = true;
-    submit.textContent = 'กำลังตรวจสอบ...';
+    const button = $('#submit');
+    button.disabled = true;
+    button.textContent = 'กำลังตรวจสอบ...';
     try {
       const { data, error } = await db.auth.signInWithPassword({
-        email: emailInput.value.trim(),
-        password: passwordInput.value
+        email: $('#email').value.trim(), password: $('#password').value
       });
       if (error) throw error;
       const { data: admin, error: membershipError } = await db
@@ -49,12 +76,13 @@
     } catch (error) {
       Swal.fire('เข้าสู่ระบบไม่สำเร็จ', error.message || 'กรุณาตรวจสอบอีเมลและรหัสผ่าน', 'error');
     } finally {
-      submit.disabled = false;
-      submit.textContent = 'เข้าสู่ระบบ';
+      button.disabled = false;
+      button.textContent = 'เข้าสู่ระบบ';
     }
   });
 
-  document.querySelector('#forgot').addEventListener('click', async () => {
+  $('#forgot').addEventListener('click', async () => {
+    const emailInput = $('#email');
     const email = emailInput.value.trim();
     if (!email || !emailInput.checkValidity()) {
       await Swal.fire('กรุณากรอกอีเมล', 'ระบุอีเมลบัญชีที่ต้องการตั้งหรือรีเซ็ตรหัสผ่านก่อน', 'info');
@@ -70,13 +98,45 @@
     if (!result.isConfirmed) return;
     try {
       const { error } = await db.auth.resetPasswordForEmail(email, {
-        redirectTo: location.origin + '/admin/set-password.html'
+        redirectTo: location.origin + '/admin/login.html'
       });
       if (error) throw error;
       await Swal.fire('ส่งคำขอแล้ว', 'หากอีเมลนี้ลงทะเบียนไว้ ระบบจะส่งลิงก์ตั้งรหัสผ่าน กรุณาตรวจสอบกล่องจดหมายและ Spam', 'success');
     } catch (error) {
       Swal.fire('ส่งอีเมลไม่สำเร็จ', error.message, 'error');
     }
+  });
+
+  $('#setup-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const password = $('#new-password').value;
+    if (password.length < 10) {
+      await Swal.fire('รหัสผ่านสั้นเกินไป', 'กรุณากำหนดรหัสผ่านอย่างน้อย 10 ตัวอักษร', 'warning');
+      return;
+    }
+    if (password !== $('#confirm-password').value) {
+      await Swal.fire('รหัสผ่านไม่ตรงกัน', 'กรุณากรอกรหัสผ่านทั้งสองช่องให้ตรงกัน', 'warning');
+      return;
+    }
+    const button = $('#save-password');
+    button.disabled = true;
+    try {
+      const { error } = await db.auth.updateUser({ password });
+      if (error) throw error;
+      await db.auth.signOut();
+      await Swal.fire('ตั้งรหัสผ่านสำเร็จ', 'เข้าสู่ระบบด้วยรหัสผ่านใหม่ได้แล้ว', 'success');
+      location.replace('login.html');
+    } catch (error) {
+      Swal.fire('บันทึกไม่สำเร็จ', error.message, 'error');
+      button.disabled = false;
+    }
+  });
+
+  showSetupIfRecovery().catch(error => {
+    $('#setup-status').textContent = error.message;
+    loginPanel.hidden = true;
+    setupPanel.hidden = false;
+    $('#save-password').disabled = true;
   });
 })();
 </script>
