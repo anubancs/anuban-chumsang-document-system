@@ -3,7 +3,7 @@
   const db = () => window.schoolSupabase;
 
   // Public Apps Script Web App URL only. Never place Telegram tokens or private secrets here.
-  window.SCHOOL_GAS_WEB_APP_URL = window.SCHOOL_GAS_WEB_APP_URL || '';
+  window.SCHOOL_GAS_WEB_APP_URL = window.SCHOOL_GAS_WEB_APP_URL || 'https://script.google.com/macros/s/AKfycbygkL-oP_5_5QQsHA5ZshaJOwHpYVRJElV3dsD-1kPvQG0ghRh_oR3DRP9VDYDEK-8g/exec';
 
   window.schoolAPI = {
     async latestNews(limit = 4) {
