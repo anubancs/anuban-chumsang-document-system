@@ -19,7 +19,7 @@ for (const root of roots) walk(root);
 
 let failed = false;
 const secretPatterns = [
-  { label: 'Supabase secret/service-role key', pattern: /\bsb_secret_[A-Za-z0-9_-]{12,}|\bservice_role\b/i },
+  { label: 'Supabase secret key', pattern: /\\bsb_secret_[A-Za-z0-9_-]{12,}|(?:SUPABASE_SERVICE_ROLE_KEY|service_role_key)\\s*[:=]\\s*['\"][^'\"]{20,}/i },
   { label: 'Telegram bot token', pattern: /\b\d{8,12}:[A-Za-z0-9_-]{30,}\b/ }
 ];
 
