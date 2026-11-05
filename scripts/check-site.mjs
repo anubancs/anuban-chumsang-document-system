@@ -36,7 +36,7 @@ const required = [
   'index.html', 'news.html', 'news-detail.html', 'personnel.html',
   'teacher-profile.html', 'downloads.html', 'gallery.html', 'contact.html',
   'classes.html', 'admin/login.html', 'admin/dashboard.html',
-  'admin/library.html', 'assets/js/supabase.js', 'assets/js/api.js',
+  'admin/library.html', 'admin/messages.html', 'assets/js/supabase.js', 'assets/js/api.js',
   'assets/css/style.css', 'gas/Code.gs', 'supabase/schema.sql'
 ];
 for (const file of required) {
