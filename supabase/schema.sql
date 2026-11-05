@@ -1,4 +1,37 @@
--- Apply this file to Supabase SQL Editor (or use the already-applied migrations).
--- Full canonical schema is maintained in Supabase migration history.
--- Security model: public SELECT only for published content; admin writes use private.is_admin().
--- See README.md for first-admin bootstrap and verification.
+-- Canonical database setup reference for the school website.
+-- This project already has the schema applied through Supabase migrations.
+-- For a fresh compatible project, run the migration SQL from the project's migration history.
+-- Then bootstrap an owner using:
+-- insert into public.admin_users(user_id, role)
+-- values ('AUTH_USER_UUID', 'owner')
+-- on conflict (user_id) do update set role = excluded.role;
+--
+-- Core tables:
+-- admin_users(user_id uuid -> auth.users.id, role owner/admin/editor)
+-- categories(id, name, slug, description, sort_order)
+-- news(id, category_id, title, slug, excerpt, content, cover_image_url,
+--      author_name, status draft/published/archived, is_pinned, published_at,
+--      view_count, created_by, created_at, updated_at)
+-- personnel(id, full_name, position, department, bio, photo_url, email,
+--           phone_public, personal_website_url, social_links jsonb,
+--           sort_order, is_published, created_at, updated_at)
+-- downloads(id, category_id, title, description, file_url, file_type,
+--           file_size_label, download_count, is_published, sort_order, created_at)
+-- galleries(id, title, description, cover_image_url, image_urls jsonb,
+--           event_date, is_published, sort_order, created_at)
+-- events(id, title, description, location, starts_at, ends_at, is_published)
+-- settings(key, value jsonb, is_public, updated_at)
+-- contact_messages(id, sender_name, sender_email, subject, message, status, created_at)
+-- class_overview(id, academic_year, grade_label, room_label, student_count,
+--                is_published, updated_at)
+--
+-- Security:
+-- RLS is enabled on all application tables.
+-- Anonymous/authenticated visitors can read only published content (categories
+-- are public); anonymous visitors can submit contact forms.
+-- Mutations require a row in admin_users and are checked by private.is_admin().
+-- Student-identifiable data is intentionally not modeled in the public schema.
+--
+-- IMPORTANT: Supabase changed the default exposure behavior for new public tables
+-- in 2026. This schema explicitly grants only the required table privileges.
+-- Never add service_role / sb_secret keys to frontend code.
