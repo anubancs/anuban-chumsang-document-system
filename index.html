@@ -10,5 +10,18 @@
 <section class="bg-amber-50/70 py-16"><div class="max-w-7xl mx-auto px-5"><h2 class="text-3xl font-bold mb-7">บริการและข้อมูลโรงเรียน</h2><div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5"><a class="glass card-hover rounded-2xl p-6" href="personnel.html"><div class="text-3xl mb-3">👩‍🏫</div><b>ทำเนียบบุคลากร</b><p class="text-sm mt-2 opacity-70">ผู้บริหาร ครู และบุคลากร</p></a><a class="glass card-hover rounded-2xl p-6" href="downloads.html"><div class="text-3xl mb-3">📚</div><b>ดาวน์โหลดเอกสาร</b><p class="text-sm mt-2 opacity-70">แบบฟอร์มและเอกสารเผยแพร่</p></a><a class="glass card-hover rounded-2xl p-6" href="gallery.html"><div class="text-3xl mb-3">📷</div><b>ภาพกิจกรรม</b><p class="text-sm mt-2 opacity-70">ประมวลภาพกิจกรรมโรงเรียน</p></a><a class="glass card-hover rounded-2xl p-6" href="contact.html"><div class="text-3xl mb-3">📍</div><b>ติดต่อโรงเรียน</b><p class="text-sm mt-2 opacity-70">ช่องทางติดต่อและแผนที่</p></a></div></div></section></main>
 <footer class="bg-[#29151d] text-white/80 py-10"><div class="max-w-7xl mx-auto px-5 flex flex-col md:flex-row justify-between gap-4"><div><b class="text-white">โรงเรียนอนุบาลชุมแสง (วัดทับกฤชกลาง)</b><p class="text-sm mt-2">เว็บไซต์ประชาสัมพันธ์และบริการสารสนเทศของโรงเรียน</p></div><p>© <span id="current-year"></span> สงวนลิขสิทธิ์</p></div></footer>
 <script src="assets/js/supabase.js"></script><script src="assets/js/app.js"></script><script src="assets/js/api.js"></script><script>
-(async()=>{try{const rows=await schoolAPI.latestNews(4);const root=document.querySelector('#news-list');root.innerHTML=rows.length?rows.map(n=>`<article class="glass card-hover rounded-2xl overflow-hidden"><img class="w-full h-40 object-cover" src="${schoolUI.escapeHTML(n.cover_image_url||'https://placehold.co/600x400/701d32/fff?text=News')}" alt=""><div class="p-5"><p class="text-xs text-wine">${n.published_at?new Date(n.published_at).toLocaleDateString('th-TH'):''}</p><h3 class="font-semibold text-lg mt-2">${schoolUI.escapeHTML(n.title)}</h3><p class="text-sm opacity-70 mt-2">${schoolUI.escapeHTML(n.excerpt||'')}</p></div></article>`).join(''):'<p class="opacity-60">ยังไม่มีข่าวประชาสัมพันธ์</p>';}catch(e){document.querySelector('#news-list').innerHTML='<p>ไม่สามารถโหลดข่าวได้ในขณะนี้</p>';console.error(e)}})();
+(async()=>{
+  const root=document.querySelector('#news-list');
+  const render=async()=>{
+    try{
+      const rows=await schoolAPI.latestNews(4);
+      root.innerHTML=rows.length?rows.map(n=>`<article class="glass card-hover rounded-2xl overflow-hidden"><a href="news-detail.html?slug=${encodeURIComponent(n.slug)}"><img class="w-full h-40 object-cover" src="${schoolUI.escapeHTML(n.cover_image_url||'https://placehold.co/600x400/701d32/fff?text=News')}" alt=""><div class="p-5"><p class="text-xs text-wine">${n.published_at?new Date(n.published_at).toLocaleDateString('th-TH'):''}</p><h3 class="font-semibold text-lg mt-2">${schoolUI.escapeHTML(n.title)}</h3><p class="text-sm opacity-70 mt-2">${schoolUI.escapeHTML(n.excerpt||'')}</p></div></a></article>`).join(''):'<p class="opacity-60">ยังไม่มีข่าวประชาสัมพันธ์</p>';
+    }catch(e){root.innerHTML='<p>ไม่สามารถโหลดข่าวได้ในขณะนี้</p>';console.error(e)}
+  };
+  await render();
+  // Refresh the public news feed automatically when Supabase Realtime reports a change.
+  schoolSupabase.channel('school-public-news')
+    .on('postgres_changes',{event:'*',schema:'public',table:'news'},render)
+    .subscribe();
+})();
 </script></body></html>
