@@ -128,7 +128,7 @@ function uploadResponse_(requestId, result) {
 /**
  * Public school information chatbot.
  * Script Properties required: GEMINI_API_KEY, SUPABASE_PUBLISHABLE_KEY.
- * Optional: GEMINI_MODEL (defaults to gemini-2.5-flash), AI_DAILY_LIMIT (defaults to 100).
+ * Optional: GEMINI_MODEL (defaults to gemini-3.5-flash-lite), AI_DAILY_LIMIT (defaults to 100).
  */
 function schoolAiChat_(p) {
   const question = safe_(p.message, 1200);
@@ -150,7 +150,7 @@ function schoolAiChat_(p) {
   enforceAiDailyLimit_(props);
 
   const context = schoolPublicContext_(supabaseKey);
-  const model = (props.getProperty('GEMINI_MODEL') || 'gemini-2.5-flash').replace(/[^a-zA-Z0-9._-]/g, '');
+  const model = (props.getProperty('GEMINI_MODEL') || 'gemini-3.5-flash-lite').replace(/[^a-zA-Z0-9._-]/g, '');
   const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' +
     encodeURIComponent(model) + ':generateContent';
   const systemInstruction = [
@@ -235,7 +235,7 @@ function schoolAiSummary_(p) {
   const cache=CacheService.getScriptCache(), rateKey='ai_summary_'+user.id, used=Number(cache.get(rateKey)||0);
   if(used>=10)throw new Error('ใช้เครื่องมือสรุปข่าวครบ 10 ครั้งใน 5 นาที กรุณารอสักครู่');
   cache.put(rateKey,String(used+1),300);enforceAiDailyLimit_(props);
-  const model=(props.getProperty('GEMINI_MODEL')||'gemini-2.5-flash').replace(/[^a-zA-Z0-9._-]/g,'');
+  const model=(props.getProperty('GEMINI_MODEL')||'gemini-3.5-flash-lite').replace(/[^a-zA-Z0-9._-]/g,'');
   const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
   const payload={systemInstruction:{parts:[{text:'คุณเป็นบรรณาธิการข่าวประชาสัมพันธ์ของโรงเรียนไทย เขียนภาษาไทยทางการ กระชับ ชัดเจน ห้ามเพิ่มข้อเท็จจริง ตัวเลข ชื่อบุคคล วันเวลา หรือสถานที่ที่ไม่มีในต้นฉบับ ส่งคืนเฉพาะคำโปรยข่าว 1-2 ประโยค ไม่เกิน 350 ตัวอักษร'}]},
     contents:[{role:'user',parts:[{text:'หัวข้อข่าว: '+title+'\nเนื้อหาต้นฉบับ:\n'+source+'\n\nช่วยเขียนคำโปรยข่าวที่ตรงกับต้นฉบับ'}]}],
