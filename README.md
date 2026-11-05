@@ -28,10 +28,12 @@
 ## สถานะการติดตั้ง
 
 - GitHub Pages: workflow ล่าสุดผ่านแล้ว และเว็บไซต์เผยแพร่ที่ [https://anubancs.github.io/](https://anubancs.github.io/)
+- Google Apps Script + Gemini: ผู้ดูแลยืนยันว่าตั้งค่า API Key และ Deploy เวอร์ชันล่าสุดแล้ว; ยังรอผลทดสอบคำถามจริงจากหน้าเว็บ
 - Supabase Project: `uwebbofczidcfnjbvsqu` (region `ap-southeast-1`) สถานะ ACTIVE_HEALTHY
 - ตารางสาธารณะทุกตารางเปิดใช้ RLS แล้ว
 - บัญชี Owner ถูกกำหนดไว้แล้วใน `public.admin_users`
-- **ยังต้องทำ:** ตั้งค่า Auth URL, ทดสอบการเข้าสู่ระบบจริง, Deploy Google Apps Script/ตั้ง Script Properties และเพิ่มข้อมูลจริงของโรงเรียน
+- **ดำเนินการแล้วตามการยืนยันของผู้ดูแล:** ตั้งค่า Auth URL, เข้าสู่ระบบได้, Deploy Google Apps Script และตั้งค่า Gemini API Key/Script Properties
+- **ยังต้องทดสอบ:** การทำงาน AI Chatbot และ AI Summary แบบ End-to-End ใน Browser รวมถึงเพิ่มข้อมูลจริงของโรงเรียน
 - CI ผ่านเป็นการตรวจโค้ดแบบ Static ไม่ใช่การทดสอบ End-to-End ใน Browser
 
 ## ตั้งค่า Supabase
@@ -56,11 +58,16 @@
 1. สร้างโฟลเดอร์ Google Drive สำหรับเอกสารที่ต้องการเผยแพร่
 2. เปิด [Google Apps Script](https://script.google.com/) สร้าง Project แล้วคัดลอกเนื้อหาใน `gas/Code.gs`
 3. ตั้ง Script Properties ต่อไปนี้ใน Project Settings:
-   - `DRIVE_FOLDER_ID` — Folder ID ของโฟลเดอร์ที่อนุญาตให้เผยแพร่
-   - `TELEGRAM_BOT_TOKEN` — Token จาก @BotFather
-   - `TELEGRAM_CHAT_ID` — Chat ID ของกลุ่ม/ช่องทาง
+   - `DRIVE_FOLDER_ID` — `1ptff4TPbIh9hlCwss4Fxg-lVpZfI33j8` (โฟลเดอร์กลางของโรงเรียน)
+   - `SUPABASE_PUBLISHABLE_KEY` — Publishable Key ของ Supabase (ใช้ตรวจสิทธิ์ผู้ดูแล)
+   - `GEMINI_API_KEY` — Gemini API Key (ใช้สำหรับ AI)
+   - `GEMINI_MODEL` — ไม่บังคับ ค่าเริ่มต้น `gemini-3.5-flash-lite`
+   - `AI_DAILY_LIMIT` — ไม่บังคับ ค่าเริ่มต้น 100 คำขอต่อวัน
+   - `TELEGRAM_BOT_TOKEN` และ `TELEGRAM_CHAT_ID` — ไม่บังคับ ใช้เมื่อเปิดการแจ้งเตือน Telegram
 4. Deploy เป็น Web App โดย Execute as: Me และกำหนดการเข้าถึงให้เหมาะสม
 5. นำ URL ที่ลงท้ายด้วย `/exec` ไปกำหนดใน `assets/js/api.js` ที่ `window.SCHOOL_GAS_WEB_APP_URL`
+
+**สถานะ:** ผู้ดูแลยืนยันว่า Deploy Web App แล้ว และ URL ตอบกลับ health check `school-drive-media` ได้ การตอบกลับนี้ยืนยันเฉพาะ endpoint ไม่ได้ยืนยันการอัปโหลดภาพหรือเรียก Gemini สำเร็จ
 
 **ข้อควรระวัง:** GAS Web App ที่เปิดให้บุคคลทั่วไปเรียกได้อาจถูกส่งข้อความขยะได้ โค้ดปัจจุบันมี validation, honeypot และ throttling เบื้องต้น แต่ยังไม่ใช่ระบบป้องกันสแปมระดับสูง ควรทดสอบในกลุ่ม Telegram ส่วนตัวก่อนใช้งานจริง
 
