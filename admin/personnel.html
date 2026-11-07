@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>จัดการบุคลากร · School CMS</title>
+<script src="https://cdn.tailwindcss.com"></script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script><link rel="stylesheet" href="../assets/css/style.css?v=20261107-personnel"></head>
+<body><header class="brand-gradient text-white p-5"><div class="max-w-7xl mx-auto flex flex-wrap justify-between gap-3 items-center"><b>School CMS · Personnel</b><nav class="flex flex-wrap gap-4"><a href="dashboard.html">Dashboard</a><a href="permissions.html">กำหนดสิทธิ์</a><a href="../personnel.html">ดูหน้าเว็บไซต์</a><button id="logout">ออกจากระบบ</button></nav></div></header>
+<main class="max-w-7xl mx-auto p-5 md:p-10">
+ <p class="text-wine font-semibold">PERSONNEL MANAGEMENT</p><h1 class="text-3xl font-bold mt-1">จัดการข้อมูลบุคลากร</h1><p id="identity" class="text-sm opacity-60 mt-2"></p>
+ <section class="glass rounded-2xl p-6 mt-7"><div class="flex flex-wrap justify-between gap-3 items-center"><div><h2 class="text-xl font-bold">รายชื่อบุคลากรทั้งหมด</h2><p class="text-sm opacity-70">เชื่อมบัญชีผู้ใช้เดิม กำหนดการเผยแพร่ และตรวจสอบสถานะข้อมูล</p></div><button id="refresh" class="border rounded-xl px-4 py-2">รีเฟรช</button></div><p id="staff-status" class="text-sm mt-3 opacity-70" role="status">กำลังโหลดข้อมูล...</p><div id="staff-list" class="space-y-3 mt-4"></div></section>
+ <section class="glass rounded-2xl p-6 mt-7"><h2 class="text-xl font-bold">คำขอแก้ไขข้อมูลจากบุคลากร</h2><p class="text-sm opacity-70">เมื่ออนุมัติ ข้อมูลใหม่จึงจะถูกนำไปแทนข้อมูลที่เผยแพร่บนเว็บไซต์</p><p id="request-status" class="text-sm mt-3 opacity-70" role="status">กำลังโหลดคำขอ...</p><div id="request-list" class="space-y-3 mt-4"></div></section>
+ <p class="text-xs opacity-60 mt-6">การเชื่อมบัญชีเป็นการกำหนดสิทธิ์ให้แก้ไขข้อมูลเฉพาะระเบียนของตนเองเท่านั้น บุคลากรไม่สามารถเผยแพร่หรือแก้ไขข้อมูลของผู้อื่นได้</p>
+</main>
+<script src="../assets/js/supabase.js"></script><script>
+(async()=>{
+ const db=schoolSupabase,$=s=>document.querySelector(s),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const {data:{user},error:authError}=await db.auth.getUser();if(authError||!user){location.replace('login.html');return}
+ const {data:admin,error:adminError}=await db.from('admin_users').select('role').eq('user_id',user.id).maybeSingle();
+ if(adminError||!admin){location.replace('login.html');return}
+ $('#identity').textContent=(user.email||'ผู้ดูแล')+' · '+admin.role;
+ let people=[],accounts=[];
+ async function load(){
+  $('#staff-status').textContent='กำลังโหลดข้อมูลบุคลากรและบัญชีผู้ใช้...';
+  const [staffRes,accountRes]=await Promise.all([
+   db.from('personnel').select('id,full_name,position,department,is_published,auth_user_id,sort_order').order('sort_order').order('full_name').limit(500),
+   db.rpc('list_auth_users_for_personnel_admin')
+  ]);
+  if(staffRes.error)throw staffRes.error;if(accountRes.error)throw accountRes.error;
+  people=staffRes.data||[];accounts=accountRes.data||[];
+  const linkedElsewhere=new Set(people.filter(p=>p.auth_user_id).map(p=>p.auth_user_id));
+  $('#staff-list').innerHTML=people.map(p=>{
+   const choices=accounts.filter(a=>!linkedElsewhere.has(a.user_id)||a.user_id===p.auth_user_id);
+   const opts='<option value="">— ยังไม่เชื่อมบัญชี —</option>'+choices.map(a=>'<option value="'+a.user_id+'" '+(a.user_id===p.auth_user_id?'selected':'')+'>'+esc(a.full_name||'ไม่ระบุชื่อ')+' · '+esc(a.email||'ไม่มีอีเมล')+'</option>').join('');
+   return '<article class="border rounded-2xl p-4 grid lg:grid-cols-[1fr_minmax(260px,1fr)_auto] gap-4 items-center"><div><b>'+esc(p.full_name)+'</b><p class="text-sm opacity-70">'+esc(p.position)+' · '+esc(p.department||'ไม่ระบุกลุ่มงาน')+'</p><p class="text-xs mt-1 '+(p.is_published?'text-green-700':'text-amber-700')+'">'+(p.is_published?'เผยแพร่บนเว็บไซต์แล้ว':'ฉบับร่าง · บุคคลทั่วไปยังไม่เห็น')+'</p></div><label class="text-sm">บัญชีผู้ใช้ที่เชื่อม<input type="hidden"><select data-link="'+p.id+'" class="block w-full rounded-xl border p-3 text-black mt-1">'+opts+'</select></label><div class="flex flex-wrap gap-3"><button class="underline text-wine" data-publish="'+p.id+'" data-state="'+p.is_published+'">'+(p.is_published?'ถอนเผยแพร่':'เผยแพร่')+'</button></div></article>';
+  }).join('')||'<p class="opacity-60">ยังไม่มีข้อมูลบุคลากร กรุณาเพิ่มข้อมูลจาก Dashboard ก่อน</p>';
+  $('#staff-status').textContent='แสดง '+people.length+' รายชื่อ · พบ '+accounts.length+' บัญชีผู้ใช้เดิม · '+people.filter(p=>p.auth_user_id).length+' รายชื่อเชื่อมบัญชีแล้ว';
+  await loadRequests();
+ }
+ async function loadRequests(){
+  $('#request-status').textContent='กำลังโหลดคำขอ...';
+  const {data,error}=await db.from('personnel_update_requests').select('id,personnel_id,requested_by,changes,status,created_at,personnel(full_name,position)').eq('status','pending').order('created_at',{ascending:false}).limit(100);
+  if(error)throw error;
+  $('#request-list').innerHTML=(data||[]).map(r=>{
+   const fields=Object.entries(r.changes||{}).map(([k,v])=>'<li><b>'+esc(({full_name:'ชื่อ-นามสกุล',position:'ตำแหน่ง',department:'กลุ่มงาน',bio:'ประวัติ',photo_url:'URL รูปภาพ',phone_public:'โทรศัพท์สาธารณะ',personal_website_url:'เว็บไซต์ส่วนตัว',social_links:'Social links'})[k]||k)+':</b> '+esc(typeof v==='object'?JSON.stringify(v):v)+'</li>').join('');
+   return '<article class="border rounded-2xl p-4"><div class="flex flex-wrap justify-between gap-2"><div><b>'+esc(r.personnel?.full_name||'บุคลากร')+'</b><p class="text-xs opacity-60">'+esc(r.personnel?.position||'')+' · ส่งเมื่อ '+new Date(r.created_at).toLocaleString('th-TH')+'</p></div><span class="text-xs rounded-full border px-3 py-1">รอตรวจสอบ</span></div><ul class="list-disc pl-5 text-sm mt-3 space-y-1">'+fields+'</ul><div class="flex flex-wrap gap-3 mt-4"><button class="brand-gradient text-white rounded-lg px-4 py-2" data-review="'+r.id+'" data-decision="approve">อนุมัติและปรับปรุงข้อมูล</button><button class="border border-red-300 text-red-700 rounded-lg px-4 py-2" data-review="'+r.id+'" data-decision="reject">ไม่อนุมัติ</button></div></article>';
+  }).join('')||'<p class="opacity-60">ยังไม่มีคำขอแก้ไขที่รอตรวจสอบ</p>';
+  $('#request-status').textContent='คำขอที่รอตรวจสอบ '+(data||[]).length+' รายการ';
+ }
+ $('#staff-list').addEventListener('change',async e=>{
+  const s=e.target.closest('[data-link]');if(!s)return;
+  const id=s.dataset.link,person=people.find(p=>p.id===id);if(!person)return;
+  const {error}=await db.from('personnel').update({auth_user_id:s.value||null}).eq('id',id);
+  if(error){await Swal.fire('เชื่อมบัญชีไม่สำเร็จ',error.message,'error');await load();return}
+  await load();Swal.fire({toast:true,position:'top-end',icon:'success',title:'บันทึกการเชื่อมบัญชีแล้ว',showConfirmButton:false,timer:1700});
+ });
+ $('#staff-list').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-publish]');if(!b)return;
+  const next=b.dataset.state!=='true';const p=people.find(x=>x.id===b.dataset.publish);
+  const confirm=await Swal.fire({title:next?'เผยแพร่ข้อมูลบุคลากร?':'ถอนการเผยแพร่?',text:p?.full_name||'',icon:'question',showCancelButton:true,confirmButtonText:next?'เผยแพร่':'ถอนเผยแพร่',cancelButtonText:'ยกเลิก'});
+  if(!confirm.isConfirmed)return;
+  const {error}=await db.from('personnel').update({is_published:next}).eq('id',b.dataset.publish);
+  if(error){Swal.fire('ดำเนินการไม่สำเร็จ',error.message,'error');return}await load();
+ });
+ $('#request-list').addEventListener('click',async e=>{
+  const b=e.target.closest('[data-review]');if(!b)return;
+  const approve=b.dataset.decision==='approve';
+  const confirm=await Swal.fire({title:approve?'อนุมัติข้อมูลที่แก้ไข?':'ไม่อนุมัติคำขอนี้?',input:'text',inputLabel:'หมายเหตุถึงบุคลากร (ไม่บังคับ)',showCancelButton:true,confirmButtonText:approve?'อนุมัติ':'ไม่อนุมัติ',cancelButtonText:'ยกเลิก'});
+  if(!confirm.isConfirmed)return;
+  const {error}=await db.rpc('review_personnel_update_request',{p_request_id:b.dataset.review,p_decision:approve?'approve':'reject',p_note:confirm.value||null});
+  if(error){Swal.fire('บันทึกผลไม่สำเร็จ',error.message,'error');return}await load();Swal.fire({toast:true,position:'top-end',icon:'success',title:approve?'อนุมัติข้อมูลแล้ว':'บันทึกผลการตรวจสอบแล้ว',showConfirmButton:false,timer:1700});
+ });
+ $('#refresh').addEventListener('click',()=>load().catch(e=>$('#staff-status').textContent='โหลดข้อมูลไม่สำเร็จ: '+e.message));
+ $('#logout').addEventListener('click',async()=>{await db.auth.signOut();location.replace('login.html')});
+ await load();
+})().catch(e=>{const s=document.querySelector('#staff-status');if(s)s.textContent='ไม่สามารถเปิดหน้าจัดการได้: '+e.message;console.error(e)});
+</script></body></html>
