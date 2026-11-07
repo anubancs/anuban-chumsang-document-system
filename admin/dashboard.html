@@ -13,6 +13,20 @@
     <div class="glass rounded-2xl p-5"><p class="opacity-60">เอกสารดาวน์โหลด</p><strong id="file-count" class="text-3xl">—</strong></div>
   </section>
   <section class="glass rounded-2xl p-6 mb-8">
+    <h2 class="text-xl font-bold mb-2">ตั้งค่าแผนที่ Google Maps</h2>
+    <p class="text-sm opacity-70 mb-4">เปิด Google Maps ค้นหาที่ตั้งโรงเรียน แล้วเลือก แชร์ → ฝังแผนที่ (Embed a map) คัดลอก URL จากค่า src ของ iframe มาวางที่นี่</p>
+    <label class="block text-sm mb-1" for="contact-map-url">Google Maps Embed URL</label>
+    <input id="contact-map-url" class="w-full rounded-xl p-3 text-black" type="url" inputmode="url" placeholder="https://www.google.com/maps/embed?pb=..." autocomplete="url">
+    <div class="flex flex-wrap gap-3 mt-3">
+      <button id="contact-map-preview-button" type="button" class="border border-wine text-wine rounded-xl px-4 py-2">แสดงตัวอย่าง</button>
+      <button id="contact-map-save" type="button" class="brand-gradient text-white rounded-xl px-5 py-2">บันทึกแผนที่</button>
+    </div>
+    <p id="contact-map-status" class="text-sm opacity-70 mt-3" role="status">กำลังโหลดการตั้งค่าแผนที่...</p>
+    <div id="contact-map-preview-wrap" class="hidden mt-4">
+      <iframe id="contact-map-preview" title="ตัวอย่างแผนที่โรงเรียน" class="w-full h-72 rounded-xl border-0" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+    </div>
+  </section>
+  <section class="glass rounded-2xl p-6 mb-8">
     <h2 class="text-xl font-bold mb-2">ภาพหน้าปกเว็บไซต์</h2>
     <p class="text-sm opacity-70 mb-3">จัดเก็บภาพ Hero Banner ใน Google Drive (สิทธิ์ Owner)</p>
     <div class="grid md:grid-cols-2 gap-3 items-end">
@@ -74,6 +88,41 @@
     if(error){Swal.fire('บันทึกไม่สำเร็จ',error.message,'error');return}
     $('#hero-image-status').textContent='บันทึกภาพหน้าปกแล้ว';
     Swal.fire('สำเร็จ','บันทึกภาพหน้าปกเว็บไซต์แล้ว','success');
+  });
+  const mapUrlInput=$('#contact-map-url'), mapStatus=$('#contact-map-status');
+  const isGoogleMapsEmbedUrl=value=>{
+    try{
+      const u=new URL(String(value||'').trim());
+      if(u.protocol!=='https:')return false;
+      const host=u.hostname.toLowerCase();
+      return (host==='www.google.com'&&u.pathname==='/maps/embed') ||
+        (host==='maps.google.com'&&u.pathname==='/maps'&&u.searchParams.get('output')==='embed');
+    }catch{return false}
+  };
+  const showMapPreview=value=>{
+    const url=String(value||'').trim(),wrap=$('#contact-map-preview-wrap'),frame=$('#contact-map-preview');
+    if(!isGoogleMapsEmbedUrl(url)){wrap.classList.add('hidden');frame.removeAttribute('src');return false}
+    frame.src=url;wrap.classList.remove('hidden');return true;
+  };
+  const {data:mapSetting,error:mapLoadError}=await db.from('settings').select('value').eq('key','contact_map_embed').maybeSingle();
+  if(mapLoadError)mapStatus.textContent='โหลดการตั้งค่าแผนที่ไม่สำเร็จ: '+mapLoadError.message;
+  else if(mapSetting?.value?.url){mapUrlInput.value=mapSetting.value.url;showMapPreview(mapSetting.value.url);mapStatus.textContent='โหลดแผนที่ที่บันทึกไว้แล้ว'}
+  else mapStatus.textContent='ยังไม่ได้ตั้งค่าแผนที่ กรุณาวาง Google Maps Embed URL';
+  $('#contact-map-preview-button').addEventListener('click',()=>{
+    if(!showMapPreview(mapUrlInput.value)){Swal.fire('URL ไม่ถูกต้อง','กรุณาใช้ URL จาก Google Maps → แชร์ → ฝังแผนที่ เท่านั้น','warning');return}
+    mapStatus.textContent='กำลังแสดงตัวอย่างแผนที่';
+  });
+  $('#contact-map-save').addEventListener('click',async()=>{
+    const url=mapUrlInput.value.trim();
+    if(!isGoogleMapsEmbedUrl(url)){Swal.fire('URL ไม่ถูกต้อง','รองรับ URL https://www.google.com/maps/embed?pb=... หรือ maps.google.com ที่มี output=embed','warning');return}
+    const button=$('#contact-map-save');button.disabled=true;
+    try{
+      const {error}=await db.from('settings').upsert({key:'contact_map_embed',value:{url},is_public:true},{onConflict:'key'});
+      if(error)throw error;
+      showMapPreview(url);mapStatus.textContent='บันทึกแผนที่แล้ว';
+      await Swal.fire('บันทึกสำเร็จ','หน้า contact.html จะแสดงแผนที่นี้โดยอัตโนมัติ','success');
+    }catch(error){mapStatus.textContent='บันทึกไม่สำเร็จ: '+error.message;Swal.fire('บันทึกไม่สำเร็จ',error.message,'error')}
+    finally{button.disabled=false}
   });
   const count=async t=>{const r=await db.from(t).select('*',{count:'exact',head:true});if(r.error)throw r.error;return r.count??0};
   async function stats(){try{$('#news-count').textContent=await count('news');$('#staff-count').textContent=await count('personnel');$('#file-count').textContent=await count('downloads')}catch(e){$('#status').textContent='โหลดสถิติไม่สำเร็จ: '+e.message}}
