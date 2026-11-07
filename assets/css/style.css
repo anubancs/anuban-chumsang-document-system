@@ -50,3 +50,16 @@ input:focus,textarea:focus,select:focus{border-color:#c77994!important;box-shado
 .ai-chat-form button:disabled{opacity:.5;cursor:not-allowed}
 .ai-chat-note{font-size:10px;color:#806d75;text-align:center;padding:0 10px 9px;background:#fff}
 @media(max-width:480px){.ai-chat-widget{right:12px;bottom:12px}.ai-chat-panel{right:-2px;bottom:60px;height:min(570px,calc(100vh - 90px))}}
+
+/* Homepage social video carousel */
+.video-carousel{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(280px,calc((100% - 36px)/3));gap:18px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;padding:3px 2px 18px;overscroll-behavior-inline:contain}
+.video-card{min-width:0;overflow:hidden;scroll-snap-align:start;border-radius:20px}
+.video-media{aspect-ratio:16/9;background:#2b2025;position:relative}
+.video-frame{width:100%;height:100%;border:0;display:block}
+.video-platform{display:inline-flex;background:#fceef2;color:#984761;border-radius:999px;padding:4px 10px;font-size:11px;font-weight:600}
+.video-nav-btn{width:42px;height:42px;border-radius:50%;background:#fff;border:1px solid #e9bdcb;color:#984761;font-size:28px;line-height:1;box-shadow:0 4px 14px rgba(130,78,96,.08)}
+.video-nav-btn:hover{background:#fceef2}
+.video-unavailable{display:flex;width:100%;height:100%;align-items:center;justify-content:center;color:#fff;background:linear-gradient(135deg,#984761,#d99aad);font-weight:600}
+@media(max-width:900px){.video-carousel{grid-auto-columns:minmax(260px,calc((100% - 18px)/2))}}
+@media(max-width:600px){.video-carousel{grid-auto-columns:minmax(82%,82%)}}
+@media(prefers-reduced-motion:reduce){.video-carousel{scroll-behavior:auto}}
