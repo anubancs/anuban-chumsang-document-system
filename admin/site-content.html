@@ -24,11 +24,11 @@ editor.addEventListener('click',async e=>{
   if(s.list){
    const input=b.parentElement.querySelector('[data-list]');
    if(!input)throw new Error('ไม่พบช่องกรอกข้อมูล');
-   value=input.value.split('\\n').map(line=>line.trim()).filter(Boolean).map(line=>{
+   value=input.value.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{
     const parts=line.split('|').map(x=>x.trim());
     return Object.fromEntries(s.columns.map((key,i)=>[key,parts[i]||'']));
    });
-   if(value.some(row=>row.url&&!/^https:\\/\\//i.test(String(row.url))))throw new Error('URL ของลิงก์ต้องขึ้นต้นด้วย https://');
+   if(value.some(row=>row.url&&!String(row.url).startsWith('https://')))throw new Error('URL ของลิงก์ต้องขึ้นต้นด้วย https://');
    if(s.key==='home_video_posts'&&value.some(row=>!['youtube','tiktok','google-drive'].includes(String(row.platform).toLowerCase())||!row.title||!row.url))throw new Error('กรุณาระบุแพลตฟอร์ม (youtube/tiktok/google-drive), ชื่อคลิป และ URL ให้ครบ');
   }else{
    value={};
