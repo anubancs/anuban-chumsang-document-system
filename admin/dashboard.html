@@ -128,9 +128,9 @@
   async function stats(){try{$('#news-count').textContent=await count('news');$('#staff-count').textContent=await count('personnel');$('#file-count').textContent=await count('downloads')}catch(e){$('#status').textContent='โหลดสถิติไม่สำเร็จ: '+e.message}}
   async function loadNews(){
     const root=$('#news-list');root.textContent='กำลังโหลด...';
-    const {data,error}=await db.from('news').select('id,title,slug,status,published_at,created_at').order('created_at',{ascending:false}).limit(100);
+    const {data,error}=await db.from('news').select('id,title,slug,status,published_at,created_at,is_pinned').order('created_at',{ascending:false}).limit(100);
     if(error){root.textContent='โหลดข่าวไม่สำเร็จ: '+error.message;return}
-    root.innerHTML=(data||[]).map(n=>`<article class="border rounded-xl p-4 flex flex-wrap justify-between gap-3 items-center"><div><b>${esc(n.title)}</b><p class="text-sm opacity-60">${esc(n.slug)} · ${esc(n.status)} · ${n.published_at?new Date(n.published_at).toLocaleString('th-TH'):'ยังไม่เผยแพร่'}</p></div><div class="flex flex-wrap gap-2"><button class="text-wine underline" data-edit-news="${n.id}">แก้ไข</button><button class="text-wine underline" data-toggle-news="${n.id}" data-status="${n.status}">${n.status==='published'?'ถอนเผยแพร่':'เผยแพร่'}</button><button class="text-red-700 underline" data-delete-news="${n.id}">ลบ</button></div></article>`).join('')||'<p class="opacity-60">ยังไม่มีข่าว</p>';
+    root.innerHTML=(data||[]).map(n=>`<article class="border rounded-xl p-4 flex flex-wrap justify-between gap-3 items-center"><div><b>${esc(n.title)}</b> ${n.is_pinned?'<span class="text-xs text-red-700">ประกาศสำคัญ</span>':''}<p class="text-sm opacity-60">${esc(n.slug)} · ${esc(n.status)} · ${n.published_at?new Date(n.published_at).toLocaleString('th-TH'):'ยังไม่เผยแพร่'}</p></div><div class="flex flex-wrap gap-2"><button class="text-wine underline" data-pin-news="${n.id}" data-pinned="${n.is_pinned}">${n.is_pinned?"เลิกปักหมุด":"ปักหมุดประกาศสำคัญ"}</button><button class="text-wine underline" data-edit-news="${n.id}">แก้ไข</button><button class="text-wine underline" data-toggle-news="${n.id}" data-status="${n.status}">${n.status==='published'?'ถอนเผยแพร่':'เผยแพร่'}</button><button class="text-red-700 underline" data-delete-news="${n.id}">ลบ</button></div></article>`).join('')||'<p class="opacity-60">ยังไม่มีข่าว</p>';
   }
   async function loadStaff(){
     const root=$('#staff-list');root.textContent='กำลังโหลด...';
@@ -154,7 +154,8 @@
     e.currentTarget.reset();await Promise.all([stats(),loadStaff()]);Swal.fire('สำเร็จ','เพิ่มบุคลากรเป็นฉบับร่างแล้ว','success');
   });
   $('#news-list').addEventListener('click',async e=>{
-    const edit=e.target.closest('[data-edit-news]'),toggle=e.target.closest('[data-toggle-news]'),del=e.target.closest('[data-delete-news]');
+    const edit=e.target.closest('[data-edit-news]'),toggle=e.target.closest('[data-toggle-news]'),del=e.target.closest('[data-delete-news]'),pin=e.target.closest('[data-pin-news]');
+    if(pin){const {error}=await db.from('news').update({is_pinned:pin.dataset.pinned!=='true'}).eq('id',pin.dataset.pinNews);if(error)Swal.fire('ผิดพลาด',error.message,'error');else await loadNews()}
     if(edit){
       const id=edit.dataset.editNews;const {data,error}=await db.from('news').select('*').eq('id',id).single();if(error)return Swal.fire('ผิดพลาด',error.message,'error');
       const fields=[['title','หัวข้อ',data.title],['slug','Slug',data.slug],['excerpt','คำโปรย',data.excerpt||''],['cover_image_url','URL ภาพ',data.cover_image_url||''],['content','เนื้อหา',data.content]];
