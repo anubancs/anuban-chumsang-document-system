@@ -35,12 +35,16 @@ for (const file of files.filter(file => file !== path.join('scripts', 'check-sec
 const adminPages = files.filter(file => file.startsWith(`admin${path.sep}`) && file.endsWith('.html'));
 for (const file of adminPages) {
   const source = fs.readFileSync(file, 'utf8');
+  const isStaffSelfService = file === path.join('admin', 'personnel-profile.html');
   const hasSessionCheck = file === path.join('admin', 'login.html')
     ? /signInWithPassword\s*\(/.test(source)
     : /auth\.getUser\s*\(/.test(source);
-  if (!hasSessionCheck || !/from\(['"]admin_users['"]\)/.test(source)) {
+  const hasAdminGuard = /from\(['"]admin_users['"]\)/.test(source);
+  const hasPersonnelOwnershipGuard = /from\(['"]personnel['"]\)/.test(source)
+    && /auth_user_id/.test(source);
+  if (!hasSessionCheck || (isStaffSelfService ? !hasPersonnelOwnershipGuard : !hasAdminGuard)) {
     failed = true;
-    console.error(`Admin page is missing the client-side session and admin-membership guard: ${file}`);
+    console.error(`Page is missing its required authenticated access guard: ${file}`);
   }
 }
 
