@@ -68,11 +68,20 @@
       if (error) throw error;
       const { data: admin, error: membershipError } = await db
         .from('admin_users').select('role').eq('user_id', data.user.id).maybeSingle();
-      if (membershipError || !admin) {
-        await db.auth.signOut();
-        throw new Error('บัญชีนี้ยังไม่ได้รับสิทธิ์ผู้ดูแลเว็บไซต์');
+      if (membershipError) throw membershipError;
+      if (admin) {
+        location.replace('dashboard.html');
+        return;
       }
-      location.replace('dashboard.html');
+      const { data: personnel, error: personnelError } = await db
+        .from('personnel').select('id').eq('auth_user_id', data.user.id).maybeSingle();
+      if (personnelError) throw personnelError;
+      if (personnel) {
+        location.replace('personnel-profile.html');
+        return;
+      }
+      await db.auth.signOut();
+      throw new Error('บัญชีนี้ยังไม่ได้เชื่อมกับข้อมูลบุคลากร กรุณาติดต่อผู้ดูแลเว็บไซต์');
     } catch (error) {
       Swal.fire('เข้าสู่ระบบไม่สำเร็จ', error.message || 'กรุณาตรวจสอบอีเมลและรหัสผ่าน', 'error');
     } finally {
