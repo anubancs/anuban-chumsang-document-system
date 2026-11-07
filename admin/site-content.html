@@ -11,21 +11,21 @@ const sections=[
 {key:'contact_details',title:'ข้อมูลติดต่อโรงเรียน',help:'ข้อมูลที่จะแสดงในหน้า Contact',fields:[['address','ที่อยู่โรงเรียน'],['phone','หมายเลขโทรศัพท์'],['email','อีเมล'],['facebook_url','Facebook Page URL'],['line_url','LINE Official URL'],['office_hours','เวลาทำการ']]}
 ];
 const editor=$('#editor');const loaded={};for(const s of sections){const {data}=await db.from('settings').select('value').eq('key',s.key).maybeSingle();loaded[s.key]=data?.value??(s.json?s.default:Object.fromEntries(s.fields.map(([k])=>[k,''])));const html=s.list?'<textarea data-list rows="8" placeholder="รายการแรก | รายละเอียด | https://...&#10;รายการที่สอง | รายละเอียด | https://..." class="w-full rounded-xl p-3 text-black">'+esc((Array.isArray(loaded[s.key])?loaded[s.key]:[]).map(x=>s.columns.map(k=>x[k]||'').join(' | ')).join('\n'))+'</textarea>':s.fields.map(([k,label])=>'<label class="block text-sm font-medium mt-3">'+label+'<textarea data-field="'+k+'" rows="'+(k.includes('message')||k==='history'||k==='mission'||k==='organization'?4:2)+'" class="w-full rounded-xl p-3 text-black mt-1">'+esc(loaded[s.key]?.[k]??'')+'</textarea></label>').join('');editor.insertAdjacentHTML('beforeend','<section class="glass rounded-2xl p-6"><h2 class="text-xl font-bold">'+s.title+'</h2><p class="text-sm opacity-70 mt-1">'+s.help+'</p><div class="mt-3">'+html+'</div><button type="button" data-save="'+s.key+'" class="brand-gradient text-white rounded-xl px-5 py-3 mt-4">บันทึก'+s.title+'</button><span data-status="'+s.key+'" class="text-sm ml-3"></span></section>')}
-editor.addEventListener('click',async e=>{
- const b=e.target.closest('button[data-save]');
- if(!b||!editor.contains(b))return;
- const s=sections.find(x=>x.key===b.dataset.save);
- if(!s)return;
+async function saveSection(key,b){
+ const s=sections.find(x=>x.key===key);
+ if(!s||b.disabled)return;
  const status=b.parentElement.querySelector('[data-status]');
+ const pageStatus=$('#status');
  let value;
  b.disabled=true;
  b.textContent='กำลังบันทึก...';
  if(status)status.textContent='กำลังบันทึกข้อมูล';
+ if(pageStatus)pageStatus.textContent='กำลังบันทึก '+s.title+'...';
  try{
   if(s.list){
    const input=b.parentElement.querySelector('[data-list]');
    if(!input)throw new Error('ไม่พบช่องกรอกข้อมูล');
-   value=input.value.split('\n').map(line=>line.trim()).filter(Boolean).map(line=>{
+   value=input.value.split('\\n').map(line=>line.trim()).filter(Boolean).map(line=>{
     const parts=line.split('|').map(x=>x.trim());
     return Object.fromEntries(s.columns.map((key,i)=>[key,parts[i]||'']));
    });
@@ -37,17 +37,21 @@ editor.addEventListener('click',async e=>{
   }
   const {data,error}=await db.from('settings').upsert({key:s.key,value,is_public:true},{onConflict:'key'}).select('key').single();
   if(error)throw error;
-  if(!data)throw new Error('ระบบไม่ได้ยืนยันการบันทึก กรุณาตรวจสอบสิทธิ์การแก้ไขข้อมูล');
-  if(status)status.textContent='บันทึกสำเร็จ';
+  if(!data)throw new Error('ระบบไม่ได้รับการยืนยันจากฐานข้อมูล');
+  if(status)status.textContent='บันทึกสำเร็จ ✓';
+  if(pageStatus)pageStatus.textContent='บันทึก'+s.title+'สำเร็จ';
   if(window.Swal)await Swal.fire('บันทึกสำเร็จ','บันทึก'+s.title+'เรียบร้อยแล้ว','success');
  }catch(err){
   const message=err?.message||String(err);
   if(status)status.textContent='บันทึกไม่สำเร็จ: '+message;
+  if(pageStatus)pageStatus.textContent='บันทึกไม่สำเร็จ: '+message;
+  console.error('Save settings failed:',err);
   if(window.Swal)await Swal.fire('บันทึกไม่สำเร็จ',message,'error');
  }finally{
   b.disabled=false;
   b.textContent='บันทึก'+s.title;
  }
-});
+}
+editor.querySelectorAll('button[data-save]').forEach(b=>b.addEventListener('click',()=>saveSection(b.dataset.save,b)));
 function esc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 })();</script></body></html>
